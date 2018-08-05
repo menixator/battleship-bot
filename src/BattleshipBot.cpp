@@ -299,7 +299,7 @@ void move(NAMED_BEARING namedBearing, SPEED speed) {
 
     case SOUTH_WEST:
       vertical = MOVE_DOWN;
-      horizontal = MOVE_RIGHT;
+      horizontal = MOVE_LEFT;
       break;
 
     case STATIONARY:
