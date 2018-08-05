@@ -127,12 +127,8 @@ struct Ship {
   int distance;
   int type;
   Bearings bearings;
-  bool foundNewShip;
-  Ship *prev;
 };
 
-Ship prevAllShips[MAX_SHIPS];
-int nPrevAllShips = 0;
 
 Ship allShips[MAX_SHIPS];
 Ship *me;
@@ -164,20 +160,9 @@ void fireAtShip(Ship *ship);
 void printShip(Ship *ship);
 NAMED_BEARING getNamedBearings(Coordinates to, Coordinates from);
 NAMED_BEARING getNamedBearingsToShip(Ship *to, Ship *from);
-Ship *findOldShip(Ship *newShip);
-bool areTheSameShip(Ship *curr, Ship *prev);
-
 void fireAt(Coordinates coords) { fire_at_ship(coords.x, coords.y); }
 void fireAtShip(Ship *ship) { fire_at_ship(ship->coords.x, ship->coords.y); }
 
-Bearings *createBearings(int x, int y) {
-  Bearings *bearings = (Bearings *)malloc(sizeof(Bearings));
-  bearings->hBearing = x > 0 ? POS : x < 0 ? NEG : ZERO;
-  bearings->vBearing = y > 0 ? POS : y < 0 ? NEG : ZERO;
-  bearings->vSpeed = SLOW;
-  bearings->hSpeed = SLOW;
-  return bearings;
-}
 
 void printShip(Ship *ship) {
   printf("Ship{x=%d, y=%d, health=%d, flag=%d, type=%d, distance=%d}\n",
@@ -203,50 +188,11 @@ NAMED_BEARING getNamedBearings(Coordinates to, Coordinates from) {
   }
 }
 
-void updateBearings(Bearings *bearings, Coordinates to, Coordinates from) {
-  int diffX = abs(to.x - from.x);
-  if (diffX > 0) {
-    bearings->hBearing = POS;
-  } else if (diffX == 0) {
-    bearings->hBearing = ZERO;
-  } else if (diffX < 0) {
-    bearings->hBearing = NEG;
-  }
-  bearings->hSpeed = diffX == 0 ? REST : diffX >= 2 ? FAST : SLOW;
-
-  int diffY = abs(to.y - from.y);
-  if (diffY > 0) {
-    bearings->vBearing = POS;
-  } else if (diffY == 0) {
-    bearings->vBearing = ZERO;
-  } else if (diffY < 0) {
-    bearings->vBearing = NEG;
-  }
-  bearings->vSpeed = diffY == 0 ? REST : diffY >= 2 ? FAST : SLOW;
-}
 
 NAMED_BEARING getNamedBearingsToShip(Ship *to, Ship *from) {
   return getNamedBearings(to->coords, from->coords);
 }
 
-Ship *findOldShip(Ship *newShip) {
-  if (nPrevAllShips == 0) return NULL;
-  for (int i = 1; i < nPrevAllShips; i++) {
-    if (!prevAllShips[i].foundNewShip &&
-        areTheSameShip(newShip, &prevAllShips[i])) {
-      prevAllShips[i].foundNewShip = true;
-
-      return &prevAllShips[i];
-    }
-  }
-  return NULL;
-}
-
-bool areTheSameShip(Ship *curr, Ship *prev) {
-  return prev->health >= curr->health &&
-         abs(prev->coords.x - curr->coords.x) <= 2 &&
-         abs(prev->coords.y - curr->coords.y) <= 2;
-}
 
 NAMED_BEARING jiggle(NAMED_BEARING dir) {
   switch (dir) {
@@ -319,20 +265,7 @@ void moveTowards(Ship *ship) {
   move(moveDirection, FAST);
 }
 
-Coordinates nextTickPos(Coordinates coords, Bearings bearings) {
-  coords.x += bearings.hBearing * bearings.hSpeed;
-  coords.y += bearings.vBearing * bearings.vSpeed;
-  return coords;
-}
 
-void predictionFire(Ship *ship) {
-  Coordinates nextFirePos = nextTickPos(ship->coords, ship->bearings);
-  if (nextFirePos.x <= 10 || nextFirePos.x >= 995 || nextFirePos.y >= 995 ||
-      nextFirePos.y <= 10) {
-    nextFirePos = ship->coords;
-  }
-  fireAt(nextFirePos);
-}
 
 void tactics() {
   if (ticks >= TICK_MAX) {
@@ -350,14 +283,9 @@ void tactics() {
 
   set_new_flag(10);
 
-  nPrevAllShips = number_of_ships;
   nFriends = 0;
   nEnemies = 0;
 
-  // Clear all the arrays
-  memset(prevAllShips, 0, sizeof prevAllShips);
-
-  if (nPrevAllShips > 0) memcpy(prevAllShips, allShips, sizeof prevAllShips);
 
   memset(enemies, 0, sizeof enemies);
   memset(friends, 0, sizeof friends);
@@ -370,7 +298,6 @@ void tactics() {
   allShips->distance = 0;
   allShips->type = myType;
   allShips->health = myHealth;
-  allShips->prev = nPrevAllShips > 0 ? prevAllShips : NULL;
 
   me = allShips;
 
@@ -387,17 +314,6 @@ void tactics() {
       allShips[i].type = shipType[i];
       allShips[i].health = shipHealth[i];
 
-      allShips[i].bearings.hSpeed = REST;
-      allShips[i].bearings.vSpeed = REST;
-      allShips[i].bearings.hBearing = ZERO;
-      allShips[i].bearings.vBearing = ZERO;
-
-      allShips[i].prev = findOldShip(&allShips[i]);
-
-      if (allShips[i].prev != NULL) {
-        updateBearings(&allShips->bearings, allShips[i].coords,
-                       allShips[i].prev->coords);
-      }
 
       if (isFriendly(i)) {
         printShip(&allShips[i]);
@@ -431,11 +347,7 @@ void tactics() {
     moveTowards(enemies[target]);
 
     if (enemies[target]->distance <= FIRING_RANGE) {
-      if (enemies[target]->prev != NULL && false) {
-        predictionFire(enemies[target]);
-      } else {
         fireAtShip(enemies[target]);
-      }
     }
   } else {
     // printf("current coordinates: (%d, %d)\n", myX, myY);
