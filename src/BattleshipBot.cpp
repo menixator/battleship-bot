@@ -87,12 +87,18 @@ void set_new_flag(int newFlag);
 
 #define MY_FLAG 10;
 #define FIRING_RANGE 100
-#define PARANOID 1
+#define PARANOID 0
 #define VISIBLE_RANGE 200
 #define JIGGLE_DELTA 3
 #define TICK_MAX 1024
 #define CLAMP(target, min, max) \
   ((target) <= min ? min : (target) >= max ? max : (target))
+#define MAX_ALLIES 3 
+
+#define MIN_X 5;
+#define MIN_Y 5;
+#define MAX_X 995;
+#define MAX_Y 995;
 
 enum SPEED { SLOW, REST, FAST };
 enum BEARING { POS, NEG, ZERO };
