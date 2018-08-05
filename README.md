@@ -1,4 +1,5 @@
-#BattleShipBot
+BattleShipBot
+==============
 
 This is my implementation of the BattleShipBot for UWE BSc(Hons)CS CaNS module.
 
