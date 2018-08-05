@@ -90,6 +90,24 @@ void set_new_flag(int newFlag);
 #define PARANOID 1
 #define VISIBLE_RANGE 200
 
+#define TICK_MAX 1024
+
+enum DIRECTION {
+  UNDEFINED,
+  NORTH,
+  SOUTH,
+  EAST,
+  WEST,
+  NORTH_EAST,
+  NORTH_WEST,
+  SOUTH_EAST,
+  SOUTH_WEST
+};
+
+enum SPEED { SLOW, FAST };
+
+unsigned int ticks = 0;
+
 int up_down = MOVE_DOWN * MOVE_SLOW;
 int left_right = MOVE_RIGHT * MOVE_SLOW;
 
@@ -119,18 +137,133 @@ bool isFriendly(int index) {
 #endif
 }
 
+void fireAtShip(Ship *ship) { fire_at_ship(ship->x, ship->y); }
+
 void printShip(Ship *ship) {
   printf("Ship{x=%d, y=%d, health=%d, flag=%d, type=%d}\n", ship->x, ship->y,
          ship->health, ship->flag, ship->type);
 }
 
+DIRECTION directionsToShip(Ship *ship) {
+  // If x coordinates are the same, it's either south or north
+  if (me->x == ship->x) {
+    if (me->y > ship->y) return SOUTH;
+    if (me->y < ship->y) return NORTH;
+  } else if (me->y == ship->y) {
+    if (me->x > ship->x) return WEST;
+    if (me->x < ship->x) return EAST;
+  } else if (ship->x > me->x) {
+    if (ship->y > me->y) return NORTH_EAST;
+    if (ship->y < me->y) return SOUTH_EAST;
+  } else if (ship->x < me->x) {
+    if (ship->y > me->y) return NORTH_WEST;
+    if (ship->y < me->y) return SOUTH_WEST;
+  }
+  return UNDEFINED;
+}
+
+DIRECTION jiggle(DIRECTION dir) {
+  switch (dir) {
+    case NORTH:
+      return ticks % 3 == 0 ? NORTH_EAST : NORTH_WEST;
+    case SOUTH:
+      return ticks % 3 == 0 ? SOUTH_EAST : SOUTH_WEST;
+    case EAST:
+      return ticks % 3 == 0 ? NORTH_EAST : SOUTH_EAST;
+    case WEST:
+      return ticks % 3 == 0 ? NORTH_WEST : SOUTH_WEST;
+  }
+  return dir;
+}
+
+void move(DIRECTION direction, SPEED speed) {
+  int vertical = 0;
+  int horizontal = 0;
+
+  switch (direction) {
+    case NORTH:
+      printf("moving NORTH\n");
+      vertical = MOVE_UP;
+      break;
+
+    case SOUTH:
+      printf("moving SOUTH\n");
+      vertical = MOVE_DOWN;
+      break;
+
+    case EAST:
+      printf("moving EAST\n");
+      horizontal = MOVE_RIGHT;
+      break;
+
+    case WEST:
+      printf("moving WEST\n");
+      horizontal = MOVE_LEFT;
+      break;
+
+    case NORTH_EAST:
+      printf("moving NORTH_EAST\n");
+      vertical = MOVE_UP;
+      horizontal = MOVE_RIGHT;
+      break;
+
+    case NORTH_WEST:
+      printf("moving NORTH_WEST\n");
+      vertical = MOVE_UP;
+      horizontal = MOVE_LEFT;
+      break;
+
+    case SOUTH_EAST:
+      printf("moving SOUTH_EAST\n");
+      vertical = MOVE_DOWN;
+      horizontal = MOVE_RIGHT;
+      break;
+
+    case SOUTH_WEST:
+      printf("moving SOUTH_WEST\n");
+      vertical = MOVE_DOWN;
+      horizontal = MOVE_RIGHT;
+      break;
+
+    case UNDEFINED:
+      printf("NOT MOVING\n");
+      return;
+  }
+
+  if (speed == FAST) {
+    horizontal *= MOVE_FAST;
+    vertical *= MOVE_FAST;
+  }
+  move_in_direction(horizontal, vertical);
+}
+
+void moveTowards(Ship *ship) {
+  printf("Moving towards: ");
+  printShip(ship);
+  DIRECTION moveDirection = jiggle(directionsToShip(ship));
+  move(moveDirection, FAST);
+}
+
 void tactics() {
+  if (ticks >= TICK_MAX) {
+    ticks %= TICK_MAX;
+  } else {
+    ticks++;
+  }
+
+  printf("tick: %d\n", ticks);
+
   int i;
+
+  // target to fire at.
+  int target = -1;
+
   set_new_flag(10);
 
   nFriends = 0;
   nEnemies = 0;
 
+  // Clear all the arrays
   memset(enemies, 0, sizeof enemies);
   memset(friends, 0, sizeof friends);
   memset(allShips, 0, sizeof allShips);
@@ -165,54 +298,53 @@ void tactics() {
         friends[nFriends] = &allShips[i];
       } else {
         enemies[nEnemies] = &allShips[i];
-        nEnemies++;
-      }
-    }
 
-    if (nEnemies > 0) {
-      int target = -1;
-
-      for (int i = 0; i < nEnemies; i++) {
-        if (target == -1 || (
-                // If the ship is withing firing range
-                enemies[i]->distance <= FIRING_RANGE &&
+        if (target == -1 ||
+            (
                 // and it's closer
-                ((enemies[target]->distance > enemies[i]->distance
+                ((enemies[target]->distance > enemies[nEnemies]->distance
                   // or it has lower health
-                  || enemies[target]->health > enemies[i]->health)))) {
-          target = i;
+                  || enemies[target]->health > enemies[nEnemies]->health)))) {
+          target = nEnemies;
         }
-      }
-      // Do we have an ideal ship to fire at?
-      if (target > -1) {
-        printf(
-            "firing at ship at (%d, %d) with health (%d) and distance (%d)\n",
-            enemies[target]->x, enemies[target]->y, enemies[target]->health,
-            enemies[target]->distance);
-        fire_at_ship(enemies[target]->x, enemies[target]->y);
+
+        nEnemies++;
       }
     }
   } else {
     printf("no enemies in sight\n");
   }
 
-  // printf("current coordinates: (%d, %d)\n", myX, myY);
-  if (myY > 900) {
-    up_down = MOVE_DOWN * MOVE_FAST;
+  // Do we have an ideal ship to fire at?
+  if (target > -1) {
+    printf("firing at: ");
+    printShip(enemies[target]);
+    moveTowards(enemies[target]);
+
+    if (enemies[target]->distance <= FIRING_RANGE) {
+      fireAtShip(enemies[target]);
+    }
+  } else {
+    // printf("current coordinates: (%d, %d)\n", myX, myY);
+    if (myY > 900) {
+      up_down = MOVE_DOWN * MOVE_FAST;
+    }
+
+    if (myX < 200) {
+      left_right = MOVE_RIGHT * MOVE_FAST;
+    }
+
+    if (myY < 100) {
+      up_down = MOVE_UP * MOVE_FAST;
+    }
+
+    if (myX > 800) {
+      left_right = MOVE_LEFT * MOVE_FAST;
+    }
+    move_in_direction(left_right, up_down);
   }
 
-  if (myX < 200) {
-    left_right = MOVE_RIGHT * MOVE_FAST;
-  }
-
-  if (myY < 100) {
-    up_down = MOVE_UP * MOVE_FAST;
-  }
-
-  if (myX > 800) {
-    left_right = MOVE_LEFT * MOVE_FAST;
-  }
-  move_in_direction(left_right, up_down);
+  printf("tick end\n\n");
 }
 
 void messageReceived(char *msg) { printf("message recieved: %s\n", msg); }
