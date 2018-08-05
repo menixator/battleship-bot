@@ -7,10 +7,10 @@
 #include <arpa/inet.h>  //inet_addr
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>  //write
-#include <string.h>
 
 #pragma comment(lib, "wsock32.lib")
 
@@ -18,9 +18,9 @@
 #define SHIPTYPE_FRIGATE "1"
 #define SHIPTYPE_SUBMARINE "2"
 
-#define STUDENT_NUMBER "asdsadsa"
-#define STUDENT_FIRSTNAME "asdasdsad"
-#define STUDENT_FAMILYNAME "ascasdasdas"
+#define STUDENT_NUMBER "S1700804"
+#define STUDENT_FIRSTNAME "Ahmed"
+#define STUDENT_FAMILYNAME "Miljau"
 #define MY_SHIP SHIPTYPE_BATTLESHIP
 
 #define IP_ADDRESS_SERVER "127.0.0.1"
@@ -31,8 +31,6 @@
 
 #define MAX_BUFFER_SIZE 500
 #define MAX_SHIPS 200
-
-#define FIRING_RANGE 100
 
 #define MOVE_LEFT -1
 #define MOVE_RIGHT 1
@@ -87,98 +85,101 @@ void set_new_flag(int newFlag);
 /********* Your tactics code starts here *********************/
 /*************************************************************/
 
+#define MY_FLAG 10;
+#define FIRING_RANGE 100
+#define PARANOID 1
+#define VISIBLE_RANGE 200
+
 int up_down = MOVE_DOWN * MOVE_SLOW;
 int left_right = MOVE_RIGHT * MOVE_SLOW;
 
-int shipDistance[MAX_SHIPS];
+int nFriends;
+int nEnemies;
 
-int number_of_friends;
-int friendX[MAX_SHIPS];
-int friendY[MAX_SHIPS];
-int friendHealth[MAX_SHIPS];
-int friendFlag[MAX_SHIPS];
-int friendDistance[MAX_SHIPS];
-int friendType[MAX_SHIPS];
+struct Ship {
+  int id;
+  int x;
+  int y;
+  int health;
+  int flag;
+  int distance;
+  int type;
+};
+Ship allShips[MAX_SHIPS];
+Ship *me;
 
-int number_of_enemies;
-int enemyX[MAX_SHIPS];
-int enemyY[MAX_SHIPS];
-int enemyHealth[MAX_SHIPS];
-int enemyFlag[MAX_SHIPS];
-int enemyDistance[MAX_SHIPS];
-int enemyType[MAX_SHIPS];
+Ship *enemies[MAX_SHIPS];
+Ship *friends[MAX_SHIPS];
 
-int number_of_ships_to_avoid;
-int shipsToAvoid[MAX_SHIPS];
+bool isFriendly(int index) {
+#if PARANOID
+  return false;
+#else
+  return allShips[index].flag == MY_FLAG;
+#endif
+}
 
-bool IsaFriend(int index) {
-  bool rc;
-
-  rc = false;
-
-  if (shipFlag[index] == 10) {
-    rc = true;  // I have just seen my friend 123
-  }
-
-  return rc;
+void printShip(Ship *ship) {
+  printf("Ship{x=%d, y=%d, health=%d, flag=%d, type=%d}\n", ship->x, ship->y,
+         ship->health, ship->flag, ship->type);
 }
 
 void tactics() {
   int i;
   set_new_flag(10);
-  for (i = 0; i < number_of_ships; i++) {
-    shipDistance[i] =
-        (int)sqrt((double)((shipX[i] - shipX[0]) * (shipX[i] - shipX[0]) +
-                           (shipY[i] - shipY[0]) * (shipY[i] - shipY[0])));
-  }
 
-  number_of_friends = 0;
-  number_of_enemies = 0;
-  number_of_ships_to_avoid = 0;
+  nFriends = 0;
+  nEnemies = 0;
+
+  memset(enemies, 0, sizeof enemies);
+  memset(friends, 0, sizeof friends);
+  memset(allShips, 0, sizeof allShips);
+
+  allShips[0].id = i;
+  allShips[0].x = myX;
+  allShips[0].y = myY;
+  allShips[0].flag = myFlag;
+  allShips[0].distance = 0;
+  allShips[0].type = myType;
+  allShips[0].health = myHealth;
+  me = &allShips[0];
 
   if (number_of_ships > 1) {
     for (i = 1; i < number_of_ships; i++) {
-      if (IsaFriend(i)) {
+      // Initialize struct
+      allShips[i].id = i;
+      allShips[i].x = shipX[i];
+      allShips[i].y = shipY[i];
+      allShips[i].flag = shipFlag[i];
+      allShips[i].distance =
+          (int)sqrt((double)((shipX[i] - shipX[0]) * (shipX[i] - shipX[0]) +
+                             (shipY[i] - shipY[0]) * (shipY[i] - shipY[0])));
+      allShips[i].type = shipType[i];
+      allShips[i].health = shipHealth[i];
+
+      if (isFriendly(i)) {
+        printShip(&allShips[i]);
         printf("friend with flag: %d\n", shipFlag[i]);
-        friendX[number_of_friends] = shipX[i];
-        friendY[number_of_friends] = shipY[i];
-        friendHealth[number_of_friends] = shipHealth[i];
-        friendFlag[number_of_friends] = shipFlag[i];
-        friendDistance[number_of_friends] = shipDistance[i];
-        friendType[number_of_friends] = shipType[i];
-        number_of_friends++;
+
+        nFriends++;
+        friends[nFriends] = &allShips[i];
       } else {
-        if (shipFlag[i] != 0) {
-          printf("enemy with flag number: %d\n", shipFlag[i]);
-        }
-        enemyX[number_of_enemies] = shipX[i];
-        enemyY[number_of_enemies] = shipY[i];
-        enemyHealth[number_of_enemies] = shipHealth[i];
-        enemyFlag[number_of_enemies] = shipFlag[i];
-        enemyDistance[number_of_enemies] = shipDistance[i];
-        enemyType[number_of_enemies] = shipType[i];
-        number_of_enemies++;
+        enemies[nEnemies] = &allShips[i];
+        nEnemies++;
       }
     }
 
-    if (number_of_enemies > 0) {
+    if (nEnemies > 0) {
       int target = -1;
 
-      for (int i = 0; i < number_of_enemies; i++) {
-        if (enemyFlag[i] != 0) {
-          shipsToAvoid[number_of_ships_to_avoid] = i;
-          number_of_ships_to_avoid++;
-          continue;
-        }
-
-        if ((
+      for (int i = 0; i < nEnemies; i++) {
+        if (target == -1 || (
                 // If the ship is withing firing range
-                enemyDistance[i] <= FIRING_RANGE &&
+                enemies[i]->distance <= FIRING_RANGE &&
                 // and it's closer
-                ((enemyDistance[target] > enemyDistance[i]
+                ((enemies[target]->distance > enemies[i]->distance
                   // or it has lower health
-                  || enemyHealth[target] > enemyHealth[i]) ||
-                 target == -1))) {
+                  || enemies[target]->health > enemies[i]->health)))) {
           target = i;
         }
       }
@@ -186,9 +187,9 @@ void tactics() {
       if (target > -1) {
         printf(
             "firing at ship at (%d, %d) with health (%d) and distance (%d)\n",
-            enemyX[target], enemyY[target], enemyHealth[target],
-            enemyDistance[target]);
-        fire_at_ship(enemyX[target], enemyY[target]);
+            enemies[target]->x, enemies[target]->y, enemies[target]->health,
+            enemies[target]->distance);
+        fire_at_ship(enemies[target]->x, enemies[target]->y);
       }
     }
   } else {
@@ -232,14 +233,12 @@ void communicate_with_server() {
 
   sprintf(buffer, "Register  %s,%s,%s,%s", STUDENT_NUMBER, STUDENT_FIRSTNAME,
           STUDENT_FAMILYNAME, MY_SHIP);
-  printf("Buffer: '%s', bufferSize: %lu", buffer, sizeof(buffer));
   sendto(sock_send, buffer, strlen(buffer), 0, (sockaddr *)&sendto_addr,
          sizeof(sockaddr));
   while (true) {
     if (recvfrom(sock_recv, buffer, sizeof(buffer) - 1, 0,
                  (sockaddr *)&receive_addr, (socklen_t *)&len)) {
       p = ::inet_ntoa(receive_addr.sin_addr);
-      printf("rcv: %d\n", ::ntohs(receive_addr.sin_port));
 
       if ((strcmp(IP_ADDRESS_SERVER, "127.0.0.1") == 0) ||
           (strcmp(IP_ADDRESS_SERVER, p) == 0)) {
