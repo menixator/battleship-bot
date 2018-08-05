@@ -91,21 +91,11 @@ void set_new_flag(int newFlag);
 #define VISIBLE_RANGE 200
 #define JIGGLE_DELTA 3
 #define TICK_MAX 1024
+#define CLAMP(target, min, max) \
+  ((target) <= min ? min : (target) >= max ? max : (target))
 
-enum DIRECTION {
-  STATIONARY,
-  NORTH,
-  SOUTH,
-  EAST,
-  WEST,
-  NORTH_EAST,
-  NORTH_WEST,
-  SOUTH_EAST,
-  SOUTH_WEST
-};
-
-enum SPEED { SLOW, FAST };
-enum BEARING { POS, NEG };
+enum SPEED { SLOW, REST, FAST };
+enum BEARING { POS, NEG, ZERO };
 
 struct Bearings {
   BEARING hBearing;
@@ -136,7 +126,7 @@ struct Ship {
   int flag;
   int distance;
   int type;
-  DIRECTION direction;
+  Bearings bearings;
   bool foundNewShip;
   Ship *prev;
 };
@@ -158,14 +148,36 @@ bool isFriendly(int index) {
 #endif
 }
 
+enum NAMED_BEARING {
+  STATIONARY,
+  NORTH,
+  SOUTH,
+  EAST,
+  WEST,
+  NORTH_EAST,
+  NORTH_WEST,
+  SOUTH_EAST,
+  SOUTH_WEST
+};
+
 void fireAtShip(Ship *ship);
 void printShip(Ship *ship);
-DIRECTION getDirections(Coordinates to, Coordinates from);
-DIRECTION directionsToShip(Ship *to, Ship *from);
+NAMED_BEARING getNamedBearings(Coordinates to, Coordinates from);
+NAMED_BEARING getNamedBearingsToShip(Ship *to, Ship *from);
 Ship *findOldShip(Ship *newShip);
 bool areTheSameShip(Ship *curr, Ship *prev);
 
+void fireAt(Coordinates coords) { fire_at_ship(coords.x, coords.y); }
 void fireAtShip(Ship *ship) { fire_at_ship(ship->coords.x, ship->coords.y); }
+
+Bearings *createBearings(int x, int y) {
+  Bearings *bearings = (Bearings *)malloc(sizeof(Bearings));
+  bearings->hBearing = x > 0 ? POS : x < 0 ? NEG : ZERO;
+  bearings->vBearing = y > 0 ? POS : y < 0 ? NEG : ZERO;
+  bearings->vSpeed = SLOW;
+  bearings->hSpeed = SLOW;
+  return bearings;
+}
 
 void printShip(Ship *ship) {
   printf("Ship{x=%d, y=%d, health=%d, flag=%d, type=%d, distance=%d}\n",
@@ -173,47 +185,7 @@ void printShip(Ship *ship) {
          ship->distance);
 }
 
-void printDirection(DIRECTION dir) {
-  switch (dir) {
-    case NORTH:
-      printf("moving NORTH\n");
-      break;
-
-    case SOUTH:
-      printf("moving SOUTH\n");
-      break;
-
-    case EAST:
-      printf("moving EAST\n");
-      break;
-
-    case WEST:
-      printf("moving WEST\n");
-      break;
-
-    case NORTH_EAST:
-      printf("moving NORTH_EAST\n");
-      break;
-
-    case NORTH_WEST:
-      printf("moving NORTH_WEST\n");
-      break;
-
-    case SOUTH_EAST:
-      printf("moving SOUTH_EAST\n");
-      break;
-
-    case SOUTH_WEST:
-      printf("moving SOUTH_WEST\n");
-      break;
-
-    case STATIONARY:
-      printf("NOT MOVING\n");
-      return;
-  }
-}
-
-DIRECTION getDirections(Coordinates to, Coordinates from) {
+NAMED_BEARING getNamedBearings(Coordinates to, Coordinates from) {
   // If x coordinates are the same, it's either south or north
   if (from.x == to.x) {
     if (from.y > to.y) return SOUTH;
@@ -231,8 +203,30 @@ DIRECTION getDirections(Coordinates to, Coordinates from) {
   }
 }
 
-DIRECTION directionsToShip(Ship *to, Ship *from) {
-  return getDirections(to->coords, from->coords);
+void updateBearings(Bearings *bearings, Coordinates to, Coordinates from) {
+  int diffX = abs(to.x - from.x);
+  if (diffX > 0) {
+    bearings->hBearing = POS;
+  } else if (diffX == 0) {
+    bearings->hBearing = ZERO;
+  } else if (diffX < 0) {
+    bearings->hBearing = NEG;
+  }
+  bearings->hSpeed = diffX == 0 ? REST : diffX >= 2 ? FAST : SLOW;
+
+  int diffY = abs(to.y - from.y);
+  if (diffY > 0) {
+    bearings->vBearing = POS;
+  } else if (diffY == 0) {
+    bearings->vBearing = ZERO;
+  } else if (diffY < 0) {
+    bearings->vBearing = NEG;
+  }
+  bearings->vSpeed = diffY == 0 ? REST : diffY >= 2 ? FAST : SLOW;
+}
+
+NAMED_BEARING getNamedBearingsToShip(Ship *to, Ship *from) {
+  return getNamedBearings(to->coords, from->coords);
 }
 
 Ship *findOldShip(Ship *newShip) {
@@ -254,7 +248,7 @@ bool areTheSameShip(Ship *curr, Ship *prev) {
          abs(prev->coords.y - curr->coords.y) <= 2;
 }
 
-DIRECTION jiggle(DIRECTION dir) {
+NAMED_BEARING jiggle(NAMED_BEARING dir) {
   switch (dir) {
     case NORTH:
       return ticks % JIGGLE_DELTA == 0 ? NORTH_EAST : NORTH_WEST;
@@ -268,13 +262,10 @@ DIRECTION jiggle(DIRECTION dir) {
   return dir;
 }
 
-void move(DIRECTION direction, SPEED speed) {
+void move(NAMED_BEARING namedBearing, SPEED speed) {
   int vertical = 0;
   int horizontal = 0;
-
-  printDirection(direction);
-
-  switch (direction) {
+  switch (namedBearing) {
     case NORTH:
       vertical = MOVE_UP;
       break;
@@ -314,7 +305,6 @@ void move(DIRECTION direction, SPEED speed) {
     case STATIONARY:
       return;
   }
-
   if (speed == FAST) {
     horizontal *= MOVE_FAST;
     vertical *= MOVE_FAST;
@@ -325,8 +315,23 @@ void move(DIRECTION direction, SPEED speed) {
 void moveTowards(Ship *ship) {
   printf("Moving towards: ");
   printShip(ship);
-  DIRECTION moveDirection = jiggle(directionsToShip(ship, me));
+  NAMED_BEARING moveDirection = jiggle(getNamedBearingsToShip(ship, me));
   move(moveDirection, FAST);
+}
+
+Coordinates nextTickPos(Coordinates coords, Bearings bearings) {
+  coords.x += bearings.hBearing * bearings.hSpeed;
+  coords.y += bearings.vBearing * bearings.vSpeed;
+  return coords;
+}
+
+void predictionFire(Ship *ship) {
+  Coordinates nextFirePos = nextTickPos(ship->coords, ship->bearings);
+  if (nextFirePos.x <= 10 || nextFirePos.x >= 995 || nextFirePos.y >= 995 ||
+      nextFirePos.y <= 10) {
+    nextFirePos = ship->coords;
+  }
+  fireAt(nextFirePos);
 }
 
 void tactics() {
@@ -381,15 +386,19 @@ void tactics() {
                              (shipY[i] - shipY[0]) * (shipY[i] - shipY[0])));
       allShips[i].type = shipType[i];
       allShips[i].health = shipHealth[i];
-      allShips[i].direction = STATIONARY;
-      allShips->prev = findOldShip(&allShips[i]);
 
-      if (allShips->prev != NULL) {
-        allShips->direction =
-            getDirections(allShips->coords, allShips->prev->coords);
+      allShips[i].bearings.hSpeed = REST;
+      allShips[i].bearings.vSpeed = REST;
+      allShips[i].bearings.hBearing = ZERO;
+      allShips[i].bearings.vBearing = ZERO;
+
+      allShips[i].prev = findOldShip(&allShips[i]);
+
+      if (allShips[i].prev != NULL) {
+        updateBearings(&allShips->bearings, allShips[i].coords,
+                       allShips[i].prev->coords);
       }
 
-      allShips[i].direction = STATIONARY;
       if (isFriendly(i)) {
         printShip(&allShips[i]);
         printf("friend with flag: %d\n", shipFlag[i]);
@@ -422,7 +431,11 @@ void tactics() {
     moveTowards(enemies[target]);
 
     if (enemies[target]->distance <= FIRING_RANGE) {
-      fireAtShip(enemies[target]);
+      if (enemies[target]->prev != NULL && false) {
+        predictionFire(enemies[target]);
+      } else {
+        fireAtShip(enemies[target]);
+      }
     }
   } else {
     // printf("current coordinates: (%d, %d)\n", myX, myY);
