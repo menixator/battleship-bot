@@ -1,5 +1,5 @@
 
-TARGET_EXEC ?= a.out
+TARGET_EXEC ?= bot
 
 BUILD_DIR ?= ./build
 SRC_DIRS ?= ./src
