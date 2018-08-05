@@ -3,8 +3,14 @@
 
 #include <math.h>
 #include <iostream>
-#include <sys/types.h>
+
+#include <arpa/inet.h>  //inet_addr
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>  //write
+#include <string.h>
 
 #pragma comment(lib, "wsock32.lib")
 
@@ -20,8 +26,8 @@
 #define IP_ADDRESS_SERVER "127.0.0.1"
 //#define IP_ADDRESS_SERVER "164.11.80.69"
 
-#define PORT_SEND 1924    // We define a port that we are going to use.
-#define PORT_RECEIVE 1925 // We define a port that we are going to use.
+#define PORT_SEND 1924     // We define a port that we are going to use.
+#define PORT_RECEIVE 1925  // We define a port that we are going to use.
 
 #define MAX_BUFFER_SIZE 500
 #define MAX_SHIPS 200
@@ -35,15 +41,13 @@
 #define MOVE_FAST 2
 #define MOVE_SLOW 1
 
-SOCKADDR_IN sendto_addr;
-SOCKADDR_IN receive_addr;
+struct sockaddr_in sendto_addr;
+struct sockaddr_in receive_addr;
 
-SOCKET sock_send; // This is our socket, it is the handle to the IO address to
-                  // read/write packets
-SOCKET sock_recv; // This is our socket, it is the handle to the IO address to
-                  // read/write packets
-
-WSADATA data;
+int sock_send;  // This is our socket, it is the handle to the IO address to
+                // read/write packets
+int sock_recv;  // This is our socket, it is the handle to the IO address to
+                // read/write packets
 
 char InputBuffer[MAX_BUFFER_SIZE];
 
@@ -104,7 +108,6 @@ int enemyFlag[MAX_SHIPS];
 int enemyDistance[MAX_SHIPS];
 int enemyType[MAX_SHIPS];
 
-
 int number_of_ships_to_avoid;
 int shipsToAvoid[MAX_SHIPS];
 
@@ -114,7 +117,7 @@ bool IsaFriend(int index) {
   rc = false;
 
   if (shipFlag[index] == 10) {
-    rc = true; // I have just seen my friend 123
+    rc = true;  // I have just seen my friend 123
   }
 
   return rc;
@@ -145,7 +148,7 @@ void tactics() {
         friendType[number_of_friends] = shipType[i];
         number_of_friends++;
       } else {
-        if (shipFlag[i] != 0){
+        if (shipFlag[i] != 0) {
           printf("enemy with flag number: %d\n", shipFlag[i]);
         }
         enemyX[number_of_enemies] = shipX[i];
@@ -162,10 +165,10 @@ void tactics() {
       int target = -1;
 
       for (int i = 0; i < number_of_enemies; i++) {
-        if (enemyFlag[i] != 0){
-        	shipsToAvoid[number_of_ships_to_avoid] = i;
-        	number_of_ships_to_avoid++;
-        	continue;
+        if (enemyFlag[i] != 0) {
+          shipsToAvoid[number_of_ships_to_avoid] = i;
+          number_of_ships_to_avoid++;
+          continue;
         }
 
         if ((
@@ -183,18 +186,17 @@ void tactics() {
       if (target > -1) {
         printf(
             "firing at ship at (%d, %d) with health (%d) and distance (%d)\n",
-            enemyX[target], enemyY[target],
-            enemyHealth[target], enemyDistance[target]);
+            enemyX[target], enemyY[target], enemyHealth[target],
+            enemyDistance[target]);
         fire_at_ship(enemyX[target], enemyY[target]);
       }
     }
   } else {
-  	printf("no enemies in sight\n");
+    printf("no enemies in sight\n");
   }
 
-    //printf("current coordinates: (%d, %d)\n", myX, myY);
+  // printf("current coordinates: (%d, %d)\n", myX, myY);
   if (myY > 900) {
-
     up_down = MOVE_DOWN * MOVE_FAST;
   }
 
@@ -212,9 +214,7 @@ void tactics() {
   move_in_direction(left_right, up_down);
 }
 
-void messageReceived(char *msg) {
-  printf("message recieved: %s\n", msg);
-}
+void messageReceived(char *msg) { printf("message recieved: %s\n", msg); }
 
 /*************************************************************/
 /********* Your tactics code ends here ***********************/
@@ -222,7 +222,7 @@ void messageReceived(char *msg) {
 
 void communicate_with_server() {
   char buffer[4096];
-  int len = sizeof(SOCKADDR);
+  int len = sizeof(sockaddr);
   char chr;
   bool finished;
   int i;
@@ -233,11 +233,11 @@ void communicate_with_server() {
   sprintf(buffer, "Register  %s,%s,%s,%s", STUDENT_NUMBER, STUDENT_FIRSTNAME,
           STUDENT_FAMILYNAME, MY_SHIP);
   printf("Buffer: '%s', bufferSize: %lu", buffer, sizeof(buffer));
-  sendto(sock_send, buffer, strlen(buffer), 0, (SOCKADDR *)&sendto_addr,
-         sizeof(SOCKADDR));
+  sendto(sock_send, buffer, strlen(buffer), 0, (sockaddr *)&sendto_addr,
+         sizeof(sockaddr));
   while (true) {
     if (recvfrom(sock_recv, buffer, sizeof(buffer) - 1, 0,
-                 (SOCKADDR *)&receive_addr, &len) != SOCKET_ERROR) {
+                 (sockaddr *)&receive_addr, (socklen_t *)&len)) {
       p = ::inet_ntoa(receive_addr.sin_addr);
       printf("rcv: %d\n", ::ntohs(receive_addr.sin_port));
 
@@ -255,28 +255,28 @@ void communicate_with_server() {
             chr = buffer[i];
 
             switch (chr) {
-            case '|':
-              InputBuffer[j] = '\0';
-              j = 0;
-              sscanf(InputBuffer, "%d,%d,%d,%d", &shipX[number_of_ships],
-                     &shipY[number_of_ships], &shipHealth[number_of_ships],
-                     &shipFlag[number_of_ships], &shipType[number_of_ships]);
-              number_of_ships++;
-              break;
+              case '|':
+                InputBuffer[j] = '\0';
+                j = 0;
+                sscanf(InputBuffer, "%d,%d,%d,%d,%d", &shipX[number_of_ships],
+                       &shipY[number_of_ships], &shipHealth[number_of_ships],
+                       &shipFlag[number_of_ships], &shipType[number_of_ships]);
+                number_of_ships++;
+                break;
 
-            case '\0':
-              InputBuffer[j] = '\0';
-              sscanf(InputBuffer, "%d,%d,%d,%d", &shipX[number_of_ships],
-                     &shipY[number_of_ships], &shipHealth[number_of_ships],
-                     &shipFlag[number_of_ships], &shipType[number_of_ships]);
-              number_of_ships++;
-              finished = true;
-              break;
+              case '\0':
+                InputBuffer[j] = '\0';
+                sscanf(InputBuffer, "%d,%d,%d,%d,%d", &shipX[number_of_ships],
+                       &shipY[number_of_ships], &shipHealth[number_of_ships],
+                       &shipFlag[number_of_ships], &shipType[number_of_ships]);
+                number_of_ships++;
+                finished = true;
+                break;
 
-            default:
-              InputBuffer[j] = chr;
-              j++;
-              break;
+              default:
+                InputBuffer[j] = chr;
+                j++;
+                break;
             }
             i++;
           }
@@ -291,33 +291,32 @@ void communicate_with_server() {
         tactics();
         if (message) {
           sendto(sock_send, MsgBuffer, strlen(MsgBuffer), 0,
-                 (SOCKADDR *)&sendto_addr, sizeof(SOCKADDR));
+                 (sockaddr *)&sendto_addr, sizeof(sockaddr));
           message = false;
         }
 
         if (fire) {
           sprintf(buffer, "Fire %s,%d,%d", STUDENT_NUMBER, fireX, fireY);
-          sendto(sock_send, buffer, strlen(buffer), 0, (SOCKADDR *)&sendto_addr,
-                 sizeof(SOCKADDR));
+          sendto(sock_send, buffer, strlen(buffer), 0, (sockaddr *)&sendto_addr,
+                 sizeof(sockaddr));
           fire = false;
         }
 
         if (moveShip) {
           sprintf(buffer, "Move %s,%d,%d", STUDENT_NUMBER, moveX, moveY);
           rc = sendto(sock_send, buffer, strlen(buffer), 0,
-                      (SOCKADDR *)&sendto_addr, sizeof(SOCKADDR));
+                      (sockaddr *)&sendto_addr, sizeof(sockaddr));
           moveShip = false;
         }
 
         if (setFlag) {
           sprintf(buffer, "Flag %s,%d", STUDENT_NUMBER, new_flag);
-          sendto(sock_send, buffer, strlen(buffer), 0, (SOCKADDR *)&sendto_addr,
-                 sizeof(SOCKADDR));
+          sendto(sock_send, buffer, strlen(buffer), 0, (sockaddr *)&sendto_addr,
+                 sizeof(sockaddr));
           setFlag = false;
         }
       }
     } else {
-      printf("recvfrom error = %d\n", WSAGetLastError());
     }
   }
 
@@ -336,14 +335,10 @@ void fire_at_ship(int X, int Y) {
 }
 
 void move_in_direction(int X, int Y) {
-  if (X < -2)
-    X = -2;
-  if (X > 2)
-    X = 2;
-  if (Y < -2)
-    Y = -2;
-  if (Y > 2)
-    Y = 2;
+  if (X < -2) X = -2;
+  if (X > 2) X = 2;
+  if (Y < -2) Y = -2;
+  if (Y > 2) Y = 2;
 
   moveShip = true;
   moveX = X;
@@ -355,7 +350,7 @@ void set_new_flag(int newFlag) {
   new_flag = newFlag;
 }
 
-int _tmain(int argc, _TCHAR *argv[]) {
+int main(int argc, char *argv[]) {
   char chr = '\0';
 
   printf("\n");
@@ -363,54 +358,40 @@ int _tmain(int argc, _TCHAR *argv[]) {
   printf("UWE Computer and Network Systems Assignment 2 (2016-17)\n");
   printf("\n");
 
-  if (WSAStartup(MAKEWORD(2, 2), &data) != 0)
-    return (0);
-
-  // sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);  // Here we create our
-  // socket, which will be a UDP socket (SOCK_DGRAM).
-  // if (!sock)
-  //{
-  //	printf("Socket creation failed!\n");
-  //}
-
-  sock_send = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); // Here we create our
-                                                        // socket, which will be
-                                                        // a UDP socket
-                                                        // (SOCK_DGRAM).
+  sock_send = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);  // Here we create our
+                                                         // socket, which will
+                                                         // be a UDP socket
+                                                         // (SOCK_DGRAM).
   if (!sock_send) {
     printf("Socket creation failed!\n");
   }
 
-  sock_recv = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); // Here we create our
-                                                        // socket, which will be
-                                                        // a UDP socket
-                                                        // (SOCK_DGRAM).
+  sock_recv = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);  // Here we create our
+                                                         // socket, which will
+                                                         // be a UDP socket
+                                                         // (SOCK_DGRAM).
   if (!sock_recv) {
     printf("Socket creation failed!\n");
   }
 
-  memset(&sendto_addr, 0, sizeof(SOCKADDR_IN));
   sendto_addr.sin_family = AF_INET;
   sendto_addr.sin_addr.s_addr = inet_addr(IP_ADDRESS_SERVER);
   sendto_addr.sin_port = htons(PORT_SEND);
 
-  memset(&receive_addr, 0, sizeof(SOCKADDR_IN));
   receive_addr.sin_family = AF_INET;
   //	receive_addr.sin_addr.s_addr = inet_addr(IP_ADDRESS_SERVER);
   receive_addr.sin_addr.s_addr = INADDR_ANY;
   receive_addr.sin_port = htons(PORT_RECEIVE);
 
-  int ret = bind(sock_recv, (SOCKADDR *)&receive_addr, sizeof(SOCKADDR));
-  //	int ret = bind(sock_send, (SOCKADDR *)&receive_addr, sizeof(SOCKADDR));
+  int ret = bind(sock_recv, (sockaddr *)&receive_addr, sizeof(sockaddr));
+  //	int ret = bind(sock_send, (sockaddr *)&receive_addr, sizeof(sockaddr));
   if (ret) {
-    printf("Bind failed! %d\n", WSAGetLastError());
   }
 
   communicate_with_server();
 
-  closesocket(sock_send);
-  closesocket(sock_recv);
-  WSACleanup();
+  close(sock_send);
+  close(sock_recv);
 
   while (chr != '\n') {
     chr = getchar();
