@@ -89,11 +89,11 @@ void set_new_flag(int newFlag);
 #define FIRING_RANGE 100
 #define PARANOID 1
 #define VISIBLE_RANGE 200
-
+#define JIGGLE_DELTA 3
 #define TICK_MAX 1024
 
 enum DIRECTION {
-  UNDEFINED,
+  STATIONARY,
   NORTH,
   SOUTH,
   EAST,
@@ -105,6 +105,14 @@ enum DIRECTION {
 };
 
 enum SPEED { SLOW, FAST };
+enum BEARING { POS, NEG };
+
+struct Bearings {
+  BEARING hBearing;
+  BEARING vBearing;
+  SPEED hSpeed;
+  SPEED vSpeed;
+};
 
 unsigned int ticks = 0;
 
@@ -114,15 +122,28 @@ int left_right = MOVE_RIGHT * MOVE_SLOW;
 int nFriends;
 int nEnemies;
 
+struct Coordinates {
+  int x;
+  int y;
+};
+
 struct Ship {
   int id;
+  Coordinates coords;
   int x;
   int y;
   int health;
   int flag;
   int distance;
   int type;
+  DIRECTION direction;
+  bool foundNewShip;
+  Ship *prev;
 };
+
+Ship prevAllShips[MAX_SHIPS];
+int nPrevAllShips = 0;
+
 Ship allShips[MAX_SHIPS];
 Ship *me;
 
@@ -137,41 +158,112 @@ bool isFriendly(int index) {
 #endif
 }
 
-void fireAtShip(Ship *ship) { fire_at_ship(ship->x, ship->y); }
+void fireAtShip(Ship *ship);
+void printShip(Ship *ship);
+DIRECTION getDirections(Coordinates to, Coordinates from);
+DIRECTION directionsToShip(Ship *to, Ship *from);
+Ship *findOldShip(Ship *newShip);
+bool areTheSameShip(Ship *curr, Ship *prev);
+
+void fireAtShip(Ship *ship) { fire_at_ship(ship->coords.x, ship->coords.y); }
 
 void printShip(Ship *ship) {
-  printf("Ship{x=%d, y=%d, health=%d, flag=%d, type=%d}\n", ship->x, ship->y,
-         ship->health, ship->flag, ship->type);
+  printf("Ship{x=%d, y=%d, health=%d, flag=%d, type=%d, distance=%d}\n",
+         ship->coords.x, ship->coords.y, ship->health, ship->flag, ship->type,
+         ship->distance);
 }
 
-DIRECTION directionsToShip(Ship *ship) {
-  // If x coordinates are the same, it's either south or north
-  if (me->x == ship->x) {
-    if (me->y > ship->y) return SOUTH;
-    if (me->y < ship->y) return NORTH;
-  } else if (me->y == ship->y) {
-    if (me->x > ship->x) return WEST;
-    if (me->x < ship->x) return EAST;
-  } else if (ship->x > me->x) {
-    if (ship->y > me->y) return NORTH_EAST;
-    if (ship->y < me->y) return SOUTH_EAST;
-  } else if (ship->x < me->x) {
-    if (ship->y > me->y) return NORTH_WEST;
-    if (ship->y < me->y) return SOUTH_WEST;
+void printDirection(DIRECTION dir) {
+  switch (dir) {
+    case NORTH:
+      printf("moving NORTH\n");
+      break;
+
+    case SOUTH:
+      printf("moving SOUTH\n");
+      break;
+
+    case EAST:
+      printf("moving EAST\n");
+      break;
+
+    case WEST:
+      printf("moving WEST\n");
+      break;
+
+    case NORTH_EAST:
+      printf("moving NORTH_EAST\n");
+      break;
+
+    case NORTH_WEST:
+      printf("moving NORTH_WEST\n");
+      break;
+
+    case SOUTH_EAST:
+      printf("moving SOUTH_EAST\n");
+      break;
+
+    case SOUTH_WEST:
+      printf("moving SOUTH_WEST\n");
+      break;
+
+    case STATIONARY:
+      printf("NOT MOVING\n");
+      return;
   }
-  return UNDEFINED;
+}
+
+DIRECTION getDirections(Coordinates to, Coordinates from) {
+  // If x coordinates are the same, it's either south or north
+  if (from.x == to.x) {
+    if (from.y > to.y) return SOUTH;
+    if (from.y < to.y) return NORTH;
+  } else if (from.y == to.y) {
+    if (from.x > to.x) return WEST;
+    if (from.x < to.x) return EAST;
+  } else if (to.x > from.x) {
+    if (to.y > from.y) return NORTH_EAST;
+    if (to.y < from.y) return SOUTH_EAST;
+  } else if (to.x < from.x) {
+    if (to.y > from.y) return NORTH_WEST;
+    if (to.y < from.y) return SOUTH_WEST;
+    return STATIONARY;
+  }
+}
+
+DIRECTION directionsToShip(Ship *to, Ship *from) {
+  return getDirections(to->coords, from->coords);
+}
+
+Ship *findOldShip(Ship *newShip) {
+  if (nPrevAllShips == 0) return NULL;
+  for (int i = 1; i < nPrevAllShips; i++) {
+    if (!prevAllShips[i].foundNewShip &&
+        areTheSameShip(newShip, &prevAllShips[i])) {
+      prevAllShips[i].foundNewShip = true;
+
+      return &prevAllShips[i];
+    }
+  }
+  return NULL;
+}
+
+bool areTheSameShip(Ship *curr, Ship *prev) {
+  return prev->health >= curr->health &&
+         abs(prev->coords.x - curr->coords.x) <= 2 &&
+         abs(prev->coords.y - curr->coords.y) <= 2;
 }
 
 DIRECTION jiggle(DIRECTION dir) {
   switch (dir) {
     case NORTH:
-      return ticks % 3 == 0 ? NORTH_EAST : NORTH_WEST;
+      return ticks % JIGGLE_DELTA == 0 ? NORTH_EAST : NORTH_WEST;
     case SOUTH:
-      return ticks % 3 == 0 ? SOUTH_EAST : SOUTH_WEST;
+      return ticks % JIGGLE_DELTA == 0 ? SOUTH_EAST : SOUTH_WEST;
     case EAST:
-      return ticks % 3 == 0 ? NORTH_EAST : SOUTH_EAST;
+      return ticks % JIGGLE_DELTA == 0 ? NORTH_EAST : SOUTH_EAST;
     case WEST:
-      return ticks % 3 == 0 ? NORTH_WEST : SOUTH_WEST;
+      return ticks % JIGGLE_DELTA == 0 ? NORTH_WEST : SOUTH_WEST;
   }
   return dir;
 }
@@ -180,53 +272,46 @@ void move(DIRECTION direction, SPEED speed) {
   int vertical = 0;
   int horizontal = 0;
 
+  printDirection(direction);
+
   switch (direction) {
     case NORTH:
-      printf("moving NORTH\n");
       vertical = MOVE_UP;
       break;
 
     case SOUTH:
-      printf("moving SOUTH\n");
       vertical = MOVE_DOWN;
       break;
 
     case EAST:
-      printf("moving EAST\n");
       horizontal = MOVE_RIGHT;
       break;
 
     case WEST:
-      printf("moving WEST\n");
       horizontal = MOVE_LEFT;
       break;
 
     case NORTH_EAST:
-      printf("moving NORTH_EAST\n");
       vertical = MOVE_UP;
       horizontal = MOVE_RIGHT;
       break;
 
     case NORTH_WEST:
-      printf("moving NORTH_WEST\n");
       vertical = MOVE_UP;
       horizontal = MOVE_LEFT;
       break;
 
     case SOUTH_EAST:
-      printf("moving SOUTH_EAST\n");
       vertical = MOVE_DOWN;
       horizontal = MOVE_RIGHT;
       break;
 
     case SOUTH_WEST:
-      printf("moving SOUTH_WEST\n");
       vertical = MOVE_DOWN;
       horizontal = MOVE_RIGHT;
       break;
 
-    case UNDEFINED:
-      printf("NOT MOVING\n");
+    case STATIONARY:
       return;
   }
 
@@ -240,7 +325,7 @@ void move(DIRECTION direction, SPEED speed) {
 void moveTowards(Ship *ship) {
   printf("Moving towards: ");
   printShip(ship);
-  DIRECTION moveDirection = jiggle(directionsToShip(ship));
+  DIRECTION moveDirection = jiggle(directionsToShip(ship, me));
   move(moveDirection, FAST);
 }
 
@@ -260,36 +345,51 @@ void tactics() {
 
   set_new_flag(10);
 
+  nPrevAllShips = number_of_ships;
   nFriends = 0;
   nEnemies = 0;
 
   // Clear all the arrays
+  memset(prevAllShips, 0, sizeof prevAllShips);
+
+  if (nPrevAllShips > 0) memcpy(prevAllShips, allShips, sizeof prevAllShips);
+
   memset(enemies, 0, sizeof enemies);
   memset(friends, 0, sizeof friends);
   memset(allShips, 0, sizeof allShips);
 
-  allShips[0].id = i;
-  allShips[0].x = myX;
-  allShips[0].y = myY;
-  allShips[0].flag = myFlag;
-  allShips[0].distance = 0;
-  allShips[0].type = myType;
-  allShips[0].health = myHealth;
-  me = &allShips[0];
+  allShips->id = i;
+  allShips->coords.x = myX;
+  allShips->coords.y = myY;
+  allShips->flag = myFlag;
+  allShips->distance = 0;
+  allShips->type = myType;
+  allShips->health = myHealth;
+  allShips->prev = nPrevAllShips > 0 ? prevAllShips : NULL;
+
+  me = allShips;
 
   if (number_of_ships > 1) {
     for (i = 1; i < number_of_ships; i++) {
       // Initialize struct
       allShips[i].id = i;
-      allShips[i].x = shipX[i];
-      allShips[i].y = shipY[i];
+      allShips[i].coords.x = shipX[i];
+      allShips[i].coords.y = shipY[i];
       allShips[i].flag = shipFlag[i];
       allShips[i].distance =
           (int)sqrt((double)((shipX[i] - shipX[0]) * (shipX[i] - shipX[0]) +
                              (shipY[i] - shipY[0]) * (shipY[i] - shipY[0])));
       allShips[i].type = shipType[i];
       allShips[i].health = shipHealth[i];
+      allShips[i].direction = STATIONARY;
+      allShips->prev = findOldShip(&allShips[i]);
 
+      if (allShips->prev != NULL) {
+        allShips->direction =
+            getDirections(allShips->coords, allShips->prev->coords);
+      }
+
+      allShips[i].direction = STATIONARY;
       if (isFriendly(i)) {
         printShip(&allShips[i]);
         printf("friend with flag: %d\n", shipFlag[i]);
