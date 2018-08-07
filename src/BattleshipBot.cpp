@@ -18,7 +18,7 @@
 #define SHIPTYPE_FRIGATE "1"
 #define SHIPTYPE_SUBMARINE "2"
 
-#define STUDENT_NUMBER "S1700804"
+#define STUDENT_NUMBER student_id
 #define STUDENT_FIRSTNAME "Ahmed"
 #define STUDENT_FAMILYNAME "Miljau"
 #define MY_SHIP SHIPTYPE_BATTLESHIP
@@ -66,6 +66,7 @@ bool message = false;
 char MsgBuffer[MAX_BUFFER_SIZE];
 char const *server_ip;
 char const *default_server_ip = "127.0.0.1";
+char const *student_id;
 
 char const *bind_ip;
 
@@ -523,10 +524,19 @@ int main(int argc, char *argv[]) {
   if (server_ip == NULL){
     server_ip =default_server_ip;
   }
+
+  student_id = getenv("STUDENT_ID");
+
+  if (student_id == NULL) {
+    printf("ERROR: No student id provided\n");
+    return -1;
+  }
   
   bind_ip = getenv("BIND_IP");
 
-  printf("The server ip is: %s", server_ip);
+  printf("The server ip is: %s\n", server_ip);
+  printf("The client interface ip is: %s\n", bind_ip == NULL ? "0.0.0.0" : bind_ip);
+  printf("The student id is: %s\n", student_id);
 
   printf("\n");
   printf("Battleship Bots\n");
