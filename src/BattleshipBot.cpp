@@ -24,7 +24,7 @@
 #define MY_SHIP SHIPTYPE_BATTLESHIP
 
 //#define IP_ADDRESS_SERVER "127.0.0.1"
-#define IP_ADDRESS_SERVER "172.16.28.8"
+#define IP_ADDRESS_SERVER server_ip
 
 #define PORT_SEND 1924     // We define a port that we are going to use.
 #define PORT_RECEIVE 1925  // We define a port that we are going to use.
@@ -64,6 +64,10 @@ int shipType[MAX_SHIPS];
 
 bool message = false;
 char MsgBuffer[MAX_BUFFER_SIZE];
+char const *server_ip;
+char const *default_server_ip = "127.0.0.1";
+
+char const *bind_ip;
 
 bool fire = false;
 int fireX;
@@ -514,6 +518,15 @@ void set_new_flag(int newFlag) {
 
 int main(int argc, char *argv[]) {
   char chr = '\0';
+  server_ip = getenv("SERVER_IP");
+  
+  if (server_ip == NULL){
+    server_ip =default_server_ip;
+  }
+  
+  bind_ip = getenv("BIND_IP");
+
+  printf("The server ip is: %s", server_ip);
 
   printf("\n");
   printf("Battleship Bots\n");
@@ -542,7 +555,7 @@ int main(int argc, char *argv[]) {
 
   receive_addr.sin_family = AF_INET;
   //	receive_addr.sin_addr.s_addr = inet_addr(IP_ADDRESS_SERVER);
-  receive_addr.sin_addr.s_addr = INADDR_ANY;
+  receive_addr.sin_addr.s_addr = bind_ip == NULL ? INADDR_ANY : inet_addr(bind_ip);
   receive_addr.sin_port = htons(PORT_RECEIVE);
 
   int ret = bind(sock_recv, (sockaddr *)&receive_addr, sizeof(sockaddr));
