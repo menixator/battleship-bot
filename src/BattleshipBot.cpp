@@ -288,11 +288,11 @@ void move(NAMED_BEARING namedBearing, SPEED speed) {
 }
 
 
-int diff( Coordinates *a, Coordinates *b){
-  return (int) sqrt( (a->x-b->x)*(a->x-b->x)+(a->y-b->y)+(a->y-b->y) );
+int diff( Coordinates a, Coordinates b){
+  return (int) sqrt( (a.x-b.x)*(a.x-b.x)+(a.y-b.y)+(a.y-b.y) );
 }
 
-int add(NAMED_BEARING namedBearing, SPEED speed) {
+int getNewCoordinate(Coordinates *coords, NAMED_BEARING namedBearing, SPEED speed) {
   int vertical = 0;
   int horizontal = 0;
   switch (namedBearing) {
@@ -339,20 +339,20 @@ int add(NAMED_BEARING namedBearing, SPEED speed) {
     horizontal *= MOVE_FAST;
     vertical *= MOVE_FAST;
   }
-  Coordinates coords;
-
-  coords.x = me->coords.x + horizontal;
-  coords.y = me->coords.y + vertical;
-  return diff(&me->coords, &coords);
+  coords->x = me->coords.x + horizontal;
+  coords->y = me->coords.y + vertical;
 }
 
 int cmp_direction(const void *a, const void *b, void *p_ship){
   NAMED_BEARING bearingA = *(NAMED_BEARING*) a;
   NAMED_BEARING bearingB = *(NAMED_BEARING*) b;
   Ship *ship = (Ship*) p_ship;
+  Coordinates coordA, coordB;
+  getNewCoordinate(&coordA, bearingA, FAST);
+  getNewCoordinate(&coordB, bearingB, FAST);
 
-  int diffA= add(bearingA, FAST);
-  int diffB= add(bearingA, FAST);
+  int diffA= diff(ship->coords, coordA);
+  int diffB= diff(ship->coords, coordB);
  
   // If both directions doesn't land me in the firing range
   // Choose whichever brings me closer to the target. 
