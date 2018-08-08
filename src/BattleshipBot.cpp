@@ -11,8 +11,10 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h> //write
+#include <assert.h>
 
 #pragma comment(lib, "wsock32.lib")
+
 
 #define SHIPTYPE_BATTLESHIP "0"
 #define SHIPTYPE_FRIGATE "1"
@@ -184,7 +186,11 @@ void fireAtShip(Ship *ship);
 void printShip(Ship *ship);
 
 void fireAt(Coordinates coords) { fire_at_ship(coords.x, coords.y); }
-void fireAtShip(Ship *ship) { fire_at_ship(ship->coords.x, ship->coords.y); }
+void fireAtShip(Ship *ship) {
+    printf("Firing at: ");
+    printShip(ship);
+    fire_at_ship(ship->coords.x, ship->coords.y);
+}
 
 void printShip(Ship *ship) {
   printf("Ship{x=%d, y=%d, health=%d, flag=%d, type=%d, distance=%d}\n",
@@ -251,7 +257,9 @@ void move(Bearings bearings) {
 
 
 int diff( Coordinates a, Coordinates b){
-  return (int) sqrt( (a.x-b.x)*(a.x-b.x)+(a.y-b.y)+(a.y-b.y) );
+  int ret = (int) sqrt( (a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y) );
+  assert(ret >= 0);
+  return ret;
 }
 
 int getNewCoordinate(Coordinates *coords, NAMED_BEARING namedBearing, SPEED speed) {
@@ -263,6 +271,28 @@ int getNewCoordinate(Coordinates *coords, NAMED_BEARING namedBearing, SPEED spee
   return 0;
 }
 
+#define HOVER_RANGE 10+((me->health/10)*50)
+
+bool isCloseToEdge(Coordinates coords){
+    return coords.x <= 10 || coords.x >= 980 || coords.y <= 10  || coords.y >= 980;
+}
+
+bool isXorYSame(Coordinates a, Coordinates b){
+    return abs(a.x-b.x) == 0 || abs(a.y-b.y) == 0 || (abs(a.x-b.x) == abs(a.y-b.y) && diff(a, b) <= 30);
+}
+
+int isCoordDangerous(Coordinates coords, Ship *ship){
+    int dangerousCount = 0;
+
+    for(int i=0;i<nEnemies;i++){
+        if (enemies[i]->id == ship->id) continue;
+        if (diff(coords, enemies[i]->coords) <= 80){
+            dangerousCount++;
+        }
+    }
+    return dangerousCount;
+}
+
 int cmp_direction(const void *a, const void *b, void *p_ship){
   NAMED_BEARING bearingA = *(NAMED_BEARING*) a;
   NAMED_BEARING bearingB = *(NAMED_BEARING*) b;
@@ -270,6 +300,23 @@ int cmp_direction(const void *a, const void *b, void *p_ship){
   Coordinates coordA, coordB;
   getNewCoordinate(&coordA, bearingA, FAST);
   getNewCoordinate(&coordB, bearingB, FAST);
+ 
+  int isADangerous = isCoordDangerous(coordA, ship);
+  int isBDangerous = isCoordDangerous(coordB, ship);
+  if (isADangerous < isBDangerous) return -1;
+  if (isADangerous > isBDangerous) return 1;
+
+  if (isCloseToEdge(coordA) && !isCloseToEdge(coordB)) return 1;
+  if (!isCloseToEdge(coordA) && isCloseToEdge(coordB)) return -1;
+
+  if (isXorYSame(coordA, ship->coords) && !isXorYSame(coordB, ship->coords)){
+    return -1;
+  }
+  
+  if (!isXorYSame(coordA, ship->coords) && isXorYSame(coordB, ship->coords)){
+    return 1;
+  }
+
 
   int diffA= diff(ship->coords, coordA);
   int diffB= diff(ship->coords, coordB);
@@ -277,29 +324,32 @@ int cmp_direction(const void *a, const void *b, void *p_ship){
   // If both directions doesn't land me in the firing range
   // Choose whichever brings me closer to the target. 
 
-  if (diffA > FIRING_RANGE && diffB > FIRING_RANGE){
+  if (diffA == HOVER_RANGE && diffB != HOVER_RANGE) return -1;
+  if (diffB == HOVER_RANGE && diffA != HOVER_RANGE) return 1;
+
+  if (diffA > HOVER_RANGE && diffB > HOVER_RANGE){
     return diffA - diffB;
   }
   
-  if (diffA <= FIRING_RANGE && diffB <= FIRING_RANGE){
-    return diffB-diffA;
+  if (diffA <= HOVER_RANGE && diffB <= HOVER_RANGE){
+      return -1;
   }
   
-  if (diffA <= FIRING_RANGE && diffB > FIRING_RANGE){
+  if (diffA <= HOVER_RANGE && diffB > HOVER_RANGE){
     return 1;
   }
   
-  if (diffB <= FIRING_RANGE && diffA > FIRING_RANGE){
+  if (diffB <= HOVER_RANGE && diffA > HOVER_RANGE){
     return -1;
   }
-  return 0;
+  return -1;
 }
 
 
 
 void moveTowards(Ship *ship) {
   printShip(ship);
-  qsort_r(bearings, sizeof(bearings)/sizeof(*bearings), sizeof(*bearings), cmp_direction, ( void*)ship);
+  qsort_r(bearings, sizeof(bearings)/sizeof(*bearings), sizeof(bearings[0]), cmp_direction, ( void*)ship);
   Bearings new_bearings;
   namedBearingToBearings(&new_bearings, *bearings, FAST);
   move(new_bearings);
@@ -312,10 +362,11 @@ int cmp_ship(const void *a, const void *b) {
   Ship *shipA = (Ship *)a;
   Ship *shipB = (Ship *)b;
 
-  if (shipA->distance != shipB->distance)
-    return shipA->distance - shipB->distance;
   if (shipA->health != shipB->health)
     return shipA->health - shipB->health;
+
+  if (shipA->distance != shipB->distance)
+    return shipA->distance - shipB->distance;
   return 0;
 }
 
@@ -351,6 +402,7 @@ void tactics() {
 
   me = allShips;
 
+  
   if (number_of_ships > 1) {
     printf("more than one ship visible\n");
     for (i = 1; i < number_of_ships; i++) {
@@ -380,6 +432,9 @@ void tactics() {
   
   if (nEnemies > 0) {
     printf("sorting enemies\n");
+    // Sort enemies.
+    // nEnemies: sizeof array
+    // sizeof(Ship*): enemies is a pointer array
     qsort(enemies, nEnemies, sizeof(Ship *), cmp_ship);
     target = *enemies;
   }
