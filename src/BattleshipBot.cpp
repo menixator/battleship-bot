@@ -26,8 +26,8 @@
 //#define IP_ADDRESS_SERVER "127.0.0.1"
 #define IP_ADDRESS_SERVER server_ip
 
-#define PORT_SEND 1924    // We define a port that we are going to use.
-#define PORT_RECEIVE 1925 // We define a port that we are going to use.
+#define PORT_SEND 1924   // Port to send data to
+#define PORT_RECEIVE 1925 // Port to recieve data from
 
 #define MAX_BUFFER_SIZE 500
 #define MAX_SHIPS 200
@@ -168,6 +168,17 @@ enum NAMED_BEARING {
   SOUTH_WEST
 };
 
+int bearings[] = {
+  NORTH,
+  SOUTH,
+  EAST,
+  WEST,
+  NORTH_EAST,
+  NORTH_WEST,
+  SOUTH_EAST,
+  SOUTH_WEST
+};
+
 // Function definitions.
 void fireAtShip(Ship *ship);
 void printShip(Ship *ship);
@@ -276,12 +287,103 @@ void move(NAMED_BEARING namedBearing, SPEED speed) {
   move_in_direction(horizontal, vertical);
 }
 
-void moveTowards(Ship *ship) {
-  printf("Moving towards: ");
-  printShip(ship);
-  NAMED_BEARING moveDirection = jiggle(getNamedBearingsToShip(ship, me));
-  move(moveDirection, FAST);
+Coordinates add(NAMED_BEARING namedBearing, SPEED speed) {
+  int vertical = 0;
+  int horizontal = 0;
+  switch (namedBearing) {
+  case NORTH:
+    vertical = MOVE_UP;
+    break;
+
+  case SOUTH:
+    vertical = MOVE_DOWN;
+    break;
+
+  case EAST:
+    horizontal = MOVE_RIGHT;
+    break;
+
+  case WEST:
+    horizontal = MOVE_LEFT;
+    break;
+
+  case NORTH_EAST:
+    vertical = MOVE_UP;
+    horizontal = MOVE_RIGHT;
+    break;
+
+  case NORTH_WEST:
+    vertical = MOVE_UP;
+    horizontal = MOVE_LEFT;
+    break;
+
+  case SOUTH_EAST:
+    vertical = MOVE_DOWN;
+    horizontal = MOVE_RIGHT;
+    break;
+
+  case SOUTH_WEST:
+    vertical = MOVE_DOWN;
+    horizontal = MOVE_LEFT;
+    break;
+
+  case STATIONARY:
+  break;
+  }
+  if (speed == FAST) {
+    horizontal *= MOVE_FAST;
+    vertical *= MOVE_FAST;
+  }
+  Coordinates coords;
+  coords.x = me->coords.x + horizontal;
+  coords.y = me->coords.y + vertical;
+  return coords;
+  
 }
+
+int diff( Coordinates a, Coordinates b){
+  return (int) sqrt( (a.x-b.x)*(a.x-b.x)+(a.y-b.y)+(a.y-b.y) );
+}
+
+int cmp_direction(const void *a, const void *b, void *p_ship){
+  NAMED_BEARING bearingA = *(NAMED_BEARING*) a;
+  NAMED_BEARING bearingB = *(NAMED_BEARING*) b;
+  Ship *ship = (Ship*) p_ship;
+  int diffA= diff( add(bearingA, FAST), ship->coords);
+  int diffB= diff( add(bearingB, FAST), ship->coords);
+ 
+  // If both directions doesn't land me in the firing range
+  // Choose whichever brings me closer to the target. 
+
+  if (diffA > FIRING_RANGE && diffB > FIRING_RANGE){
+    return diffA - diffB;
+  }
+  
+  if (diffA <= FIRING_RANGE && diffB <= FIRING_RANGE){
+    return diffB-diffA;
+  }
+  
+  if (diffA <= FIRING_RANGE && diffB > FIRING_RANGE){
+    return 1;
+  }
+  
+  if (diffB <= FIRING_RANGE && diffA > FIRING_RANGE){
+    return -1;
+  }
+  return 0;
+}
+
+
+
+void moveTowards(Ship *ship) {
+  printShip(ship);
+  
+  qsort_r(bearings, sizeof(bearings), sizeof(bearings[0]), cmp_direction, ( void*)ship);
+  move((NAMED_BEARING) bearings[0], FAST);
+}
+
+
+
 
 int cmp_ship(const void *a, const void *b) {
   Ship *shipA = (Ship *)a;
@@ -308,7 +410,6 @@ void tactics() {
   // target to fire at.
   Ship *target = NULL;
 
-  set_new_flag(10);
 
   nFriends = 0;
   nEnemies = 0;
@@ -328,6 +429,7 @@ void tactics() {
   me = allShips;
 
   if (number_of_ships > 1) {
+    printf("more than one ship visible\n");
     for (i = 1; i < number_of_ships; i++) {
       // Initialize struct
       allShips[i].id = i;
@@ -342,7 +444,6 @@ void tactics() {
 
       if (isFriendly(i)) {
         printShip(&allShips[i]);
-        printf("friend with flag: %d\n", shipFlag[i]);
 
         nFriends++;
         friends[nFriends] = &allShips[i];
@@ -351,18 +452,20 @@ void tactics() {
         nEnemies++;
       }
     }
-  } else {
-    printf("no enemies in sight\n");
-  }
 
+  } else {
+    printf("no ships visible\n");
+  }
+  
   if (nEnemies > 0) {
+    printf("sorting enemies\n");
     qsort(enemies, nEnemies, sizeof(Ship *), cmp_ship);
     target = *enemies;
   }
 
   // Do we have an ideal ship to fire at?
   if (target != NULL) {
-    printf("firing at: ");
+    printf("target selected\n");
     printShip(target);
     moveTowards(target);
 
@@ -370,7 +473,7 @@ void tactics() {
       fireAtShip(target);
     }
   } else {
-    // printf("current coordinates: (%d, %d)\n", myX, myY);
+    printf("there wasn't any target\n");
     if (myY > 900) {
       up_down = MOVE_DOWN * MOVE_FAST;
     }
@@ -386,14 +489,12 @@ void tactics() {
     if (myX > 800) {
       left_right = MOVE_LEFT * MOVE_FAST;
     }
-    printf("move!\n");
     move_in_direction(left_right, up_down);
   }
 
-  printf("tick end\n\n");
 }
 
-void messageReceived(char *msg) { printf("message recieved: %s\n", msg); }
+void messageReceived(char *msg) { printf("message recieved: '%s'\n", msg); }
 
 /*************************************************************/
 /********* Your tactics code ends here ***********************/
@@ -417,6 +518,7 @@ void communicate_with_server() {
     if (recvfrom(sock_recv, buffer, sizeof(buffer) - 1, 0,
                  (sockaddr *)&receive_addr, (socklen_t *)&len)) {
       p = ::inet_ntoa(receive_addr.sin_addr);
+      printf("recieved '%s' from '%s'\n", buffer, p);
 
       if ((strcmp(IP_ADDRESS_SERVER, "127.0.0.1") == 0) ||
           (strcmp(IP_ADDRESS_SERVER, p) == 0)) {
@@ -497,7 +599,6 @@ void communicate_with_server() {
     }
   }
 
-  printf("Student %s\n", STUDENT_NUMBER);
 }
 
 void send_message(char *dest, char *source, char *msg) {
@@ -582,8 +683,7 @@ int main(int argc, char *argv[]) {
 
   receive_addr.sin_family = AF_INET;
   //	receive_addr.sin_addr.s_addr = inet_addr(IP_ADDRESS_SERVER);
-  receive_addr.sin_addr.s_addr =
-      bind_ip == NULL ? INADDR_ANY : inet_addr(bind_ip);
+  receive_addr.sin_addr.s_addr =INADDR_ANY;
   receive_addr.sin_port = htons(PORT_RECEIVE);
 
   int ret = bind(sock_recv, (sockaddr *)&receive_addr, sizeof(sockaddr));
