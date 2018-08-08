@@ -92,7 +92,7 @@ void set_new_flag(int newFlag);
 
 #define MY_FLAG 10;
 #define FIRING_RANGE 100
-#define PARANOID 0
+#define PARANOID 1 
 #define VISIBLE_RANGE 200
 #define JIGGLE_DELTA 3
 #define TICK_MAX 1024
@@ -146,7 +146,9 @@ Ship *me;
 Ship *enemies[MAX_SHIPS];
 Ship *friends[MAX_SHIPS];
 
+// Returns if the ship at index is a friendly
 bool isFriendly(int index) {
+// Paranoid mode for testing.
 #if PARANOID
   return false;
 #else
@@ -154,6 +156,7 @@ bool isFriendly(int index) {
 #endif
 }
 
+// Setup simpler directions.
 enum NAMED_BEARING {
   STATIONARY,
   NORTH,
@@ -166,6 +169,7 @@ enum NAMED_BEARING {
   SOUTH_WEST
 };
 
+// Function definitions.
 void fireAtShip(Ship *ship);
 void printShip(Ship *ship);
 NAMED_BEARING getNamedBearings(Coordinates to, Coordinates from);
@@ -289,7 +293,7 @@ void tactics() {
   int i;
 
   // target to fire at.
-  int target = -1;
+  Ship* target = NULL;
 
   set_new_flag(10);
 
@@ -334,13 +338,13 @@ void tactics() {
       } else {
         enemies[nEnemies] = &allShips[i];
 
-        if (target == -1 ||
+        if (target == NULL ||
             (
                 // and it's closer
-                ((enemies[target]->distance > enemies[nEnemies]->distance
+                ((target->distance > enemies[nEnemies]->distance
                   // or it has lower health
-                  || enemies[target]->health > enemies[nEnemies]->health)))) {
-          target = nEnemies;
+                  || target->health > enemies[nEnemies]->health)))) {
+          target = enemies[nEnemies];
         }
 
         nEnemies++;
@@ -351,13 +355,13 @@ void tactics() {
   }
 
   // Do we have an ideal ship to fire at?
-  if (target > -1) {
+  if (target != NULL) {
     printf("firing at: ");
-    printShip(enemies[target]);
-    moveTowards(enemies[target]);
+    printShip(target);
+    moveTowards(target);
 
-    if (enemies[target]->distance <= FIRING_RANGE) {
-        fireAtShip(enemies[target]);
+    if (target->distance <= FIRING_RANGE) {
+        fireAtShip(target);
     }
   } else {
     // printf("current coordinates: (%d, %d)\n", myX, myY);
