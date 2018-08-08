@@ -168,7 +168,7 @@ enum NAMED_BEARING {
   SOUTH_WEST
 };
 
-int bearings[] = {
+NAMED_BEARING bearings[] = {
   NORTH,
   SOUTH,
   EAST,
@@ -244,54 +244,9 @@ int namedBearingToBearings(Bearings *bearing, NAMED_BEARING namedBearing, SPEED 
 }
 
 
-void move(NAMED_BEARING namedBearing, SPEED speed) {
-  int vertical = 0;
-  int horizontal = 0;
-  switch (namedBearing) {
-  case NORTH:
-    vertical = MOVE_UP;
-    break;
-
-  case SOUTH:
-    vertical = MOVE_DOWN;
-    break;
-
-  case EAST:
-    horizontal = MOVE_RIGHT;
-    break;
-
-  case WEST:
-    horizontal = MOVE_LEFT;
-    break;
-
-  case NORTH_EAST:
-    vertical = MOVE_UP;
-    horizontal = MOVE_RIGHT;
-    break;
-
-  case NORTH_WEST:
-    vertical = MOVE_UP;
-    horizontal = MOVE_LEFT;
-    break;
-
-  case SOUTH_EAST:
-    vertical = MOVE_DOWN;
-    horizontal = MOVE_RIGHT;
-    break;
-
-  case SOUTH_WEST:
-    vertical = MOVE_DOWN;
-    horizontal = MOVE_LEFT;
-    break;
-
-  case STATIONARY:
-    return;
-  }
-  if (speed == FAST) {
-    horizontal *= MOVE_FAST;
-    vertical *= MOVE_FAST;
-  }
-  move_in_direction(horizontal, vertical);
+void move(Bearings bearings) {
+    printf("Moving X: %d, Y: %d\n",bearings.hBearing*bearings.hSpeed, bearings.vBearing*bearings.vSpeed);
+  move_in_direction(bearings.hBearing*bearings.hSpeed, bearings.vBearing*bearings.vSpeed);
 }
 
 
@@ -300,54 +255,12 @@ int diff( Coordinates a, Coordinates b){
 }
 
 int getNewCoordinate(Coordinates *coords, NAMED_BEARING namedBearing, SPEED speed) {
-  int vertical = 0;
-  int horizontal = 0;
-  switch (namedBearing) {
-  case NORTH:
-    vertical = MOVE_UP;
-    break;
+  Bearings bearings;
+  namedBearingToBearings(&bearings, namedBearing, speed);
 
-  case SOUTH:
-    vertical = MOVE_DOWN;
-    break;
-
-  case EAST:
-    horizontal = MOVE_RIGHT;
-    break;
-
-  case WEST:
-    horizontal = MOVE_LEFT;
-    break;
-
-  case NORTH_EAST:
-    vertical = MOVE_UP;
-    horizontal = MOVE_RIGHT;
-    break;
-
-  case NORTH_WEST:
-    vertical = MOVE_UP;
-    horizontal = MOVE_LEFT;
-    break;
-
-  case SOUTH_EAST:
-    vertical = MOVE_DOWN;
-    horizontal = MOVE_RIGHT;
-    break;
-
-  case SOUTH_WEST:
-    vertical = MOVE_DOWN;
-    horizontal = MOVE_LEFT;
-    break;
-
-  case STATIONARY:
-  break;
-  }
-  if (speed == FAST) {
-    horizontal *= MOVE_FAST;
-    vertical *= MOVE_FAST;
-  }
-  coords->x = me->coords.x + horizontal;
-  coords->y = me->coords.y + vertical;
+  coords->x = me->coords.x + bearings.hBearing*bearings.hSpeed;
+  coords->y = me->coords.y + bearings.vBearing*bearings.vSpeed;
+  return 0;
 }
 
 int cmp_direction(const void *a, const void *b, void *p_ship){
@@ -386,9 +299,10 @@ int cmp_direction(const void *a, const void *b, void *p_ship){
 
 void moveTowards(Ship *ship) {
   printShip(ship);
-  
-  qsort_r(bearings, sizeof(bearings), sizeof(bearings[0]), cmp_direction, ( void*)ship);
-  move((NAMED_BEARING) bearings[0], FAST);
+  qsort_r(bearings, sizeof(bearings)/sizeof(*bearings), sizeof(*bearings), cmp_direction, ( void*)ship);
+  Bearings new_bearings;
+  namedBearingToBearings(&new_bearings, *bearings, FAST);
+  move(new_bearings);
 }
 
 
@@ -427,7 +341,7 @@ void tactics() {
   memset(friends, 0, sizeof friends);
   memset(allShips, 0, sizeof allShips);
 
-  allShips->id = i;
+  allShips->id = 0;
   allShips->coords.x = myX;
   allShips->coords.y = myY;
   allShips->flag = myFlag;
@@ -445,9 +359,7 @@ void tactics() {
       allShips[i].coords.x = shipX[i];
       allShips[i].coords.y = shipY[i];
       allShips[i].flag = shipFlag[i];
-      allShips[i].distance =
-          (int)sqrt((double)((shipX[i] - shipX[0]) * (shipX[i] - shipX[0]) +
-                             (shipY[i] - shipY[0]) * (shipY[i] - shipY[0])));
+      allShips[i].distance = diff(me->coords, allShips[i].coords);
       allShips[i].type = shipType[i];
       allShips[i].health = shipHealth[i];
 
