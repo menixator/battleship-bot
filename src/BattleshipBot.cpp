@@ -1,16 +1,16 @@
 // BattleshipBot.cpp : Defines the entry point for the console application.
 //
 
-#include <math.h>
 #include <iostream>
+#include <math.h>
 
-#include <arpa/inet.h>  //inet_addr
+#include <arpa/inet.h> //inet_addr
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <unistd.h>  //write
+#include <unistd.h> //write
 
 #pragma comment(lib, "wsock32.lib")
 
@@ -26,8 +26,8 @@
 //#define IP_ADDRESS_SERVER "127.0.0.1"
 #define IP_ADDRESS_SERVER server_ip
 
-#define PORT_SEND 1924     // We define a port that we are going to use.
-#define PORT_RECEIVE 1925  // We define a port that we are going to use.
+#define PORT_SEND 1924    // We define a port that we are going to use.
+#define PORT_RECEIVE 1925 // We define a port that we are going to use.
 
 #define MAX_BUFFER_SIZE 500
 #define MAX_SHIPS 200
@@ -42,10 +42,10 @@
 struct sockaddr_in sendto_addr;
 struct sockaddr_in receive_addr;
 
-int sock_send;  // This is our socket, it is the handle to the IO address to
-                // read/write packets
-int sock_recv;  // This is our socket, it is the handle to the IO address to
-                // read/write packets
+int sock_send; // This is our socket, it is the handle to the IO address to
+               // read/write packets
+int sock_recv; // This is our socket, it is the handle to the IO address to
+               // read/write packets
 
 char InputBuffer[MAX_BUFFER_SIZE];
 
@@ -92,13 +92,13 @@ void set_new_flag(int newFlag);
 
 #define MY_FLAG 10;
 #define FIRING_RANGE 100
-#define PARANOID 1 
+#define PARANOID 1
 #define VISIBLE_RANGE 200
 #define JIGGLE_DELTA 3
 #define TICK_MAX 1024
-#define CLAMP(target, min, max) \
+#define CLAMP(target, min, max)                                                \
   ((target) <= min ? min : (target) >= max ? max : (target))
-#define MAX_ALLIES 3 
+#define MAX_ALLIES 3
 
 #define MIN_X 5;
 #define MIN_Y 5;
@@ -139,7 +139,6 @@ struct Ship {
   int type;
 };
 
-
 Ship allShips[MAX_SHIPS];
 Ship *me;
 
@@ -177,7 +176,6 @@ NAMED_BEARING getNamedBearingsToShip(Ship *to, Ship *from);
 void fireAt(Coordinates coords) { fire_at_ship(coords.x, coords.y); }
 void fireAtShip(Ship *ship) { fire_at_ship(ship->coords.x, ship->coords.y); }
 
-
 void printShip(Ship *ship) {
   printf("Ship{x=%d, y=%d, health=%d, flag=%d, type=%d, distance=%d}\n",
          ship->coords.x, ship->coords.y, ship->health, ship->flag, ship->type,
@@ -187,37 +185,43 @@ void printShip(Ship *ship) {
 NAMED_BEARING getNamedBearings(Coordinates to, Coordinates from) {
   // If x coordinates are the same, it's either south or north
   if (from.x == to.x) {
-    if (from.y > to.y) return SOUTH;
-    if (from.y < to.y) return NORTH;
+    if (from.y > to.y)
+      return SOUTH;
+    if (from.y < to.y)
+      return NORTH;
   } else if (from.y == to.y) {
-    if (from.x > to.x) return WEST;
-    if (from.x < to.x) return EAST;
+    if (from.x > to.x)
+      return WEST;
+    if (from.x < to.x)
+      return EAST;
   } else if (to.x > from.x) {
-    if (to.y > from.y) return NORTH_EAST;
-    if (to.y < from.y) return SOUTH_EAST;
+    if (to.y > from.y)
+      return NORTH_EAST;
+    if (to.y < from.y)
+      return SOUTH_EAST;
   } else if (to.x < from.x) {
-    if (to.y > from.y) return NORTH_WEST;
-    if (to.y < from.y) return SOUTH_WEST;
+    if (to.y > from.y)
+      return NORTH_WEST;
+    if (to.y < from.y)
+      return SOUTH_WEST;
     return STATIONARY;
   }
 }
-
 
 NAMED_BEARING getNamedBearingsToShip(Ship *to, Ship *from) {
   return getNamedBearings(to->coords, from->coords);
 }
 
-
 NAMED_BEARING jiggle(NAMED_BEARING dir) {
   switch (dir) {
-    case NORTH:
-      return ticks % JIGGLE_DELTA == 0 ? NORTH_EAST : NORTH_WEST;
-    case SOUTH:
-      return ticks % JIGGLE_DELTA == 0 ? SOUTH_EAST : SOUTH_WEST;
-    case EAST:
-      return ticks % JIGGLE_DELTA == 0 ? NORTH_EAST : SOUTH_EAST;
-    case WEST:
-      return ticks % JIGGLE_DELTA == 0 ? NORTH_WEST : SOUTH_WEST;
+  case NORTH:
+    return ticks % JIGGLE_DELTA == 0 ? NORTH_EAST : NORTH_WEST;
+  case SOUTH:
+    return ticks % JIGGLE_DELTA == 0 ? SOUTH_EAST : SOUTH_WEST;
+  case EAST:
+    return ticks % JIGGLE_DELTA == 0 ? NORTH_EAST : SOUTH_EAST;
+  case WEST:
+    return ticks % JIGGLE_DELTA == 0 ? NORTH_WEST : SOUTH_WEST;
   }
   return dir;
 }
@@ -226,44 +230,44 @@ void move(NAMED_BEARING namedBearing, SPEED speed) {
   int vertical = 0;
   int horizontal = 0;
   switch (namedBearing) {
-    case NORTH:
-      vertical = MOVE_UP;
-      break;
+  case NORTH:
+    vertical = MOVE_UP;
+    break;
 
-    case SOUTH:
-      vertical = MOVE_DOWN;
-      break;
+  case SOUTH:
+    vertical = MOVE_DOWN;
+    break;
 
-    case EAST:
-      horizontal = MOVE_RIGHT;
-      break;
+  case EAST:
+    horizontal = MOVE_RIGHT;
+    break;
 
-    case WEST:
-      horizontal = MOVE_LEFT;
-      break;
+  case WEST:
+    horizontal = MOVE_LEFT;
+    break;
 
-    case NORTH_EAST:
-      vertical = MOVE_UP;
-      horizontal = MOVE_RIGHT;
-      break;
+  case NORTH_EAST:
+    vertical = MOVE_UP;
+    horizontal = MOVE_RIGHT;
+    break;
 
-    case NORTH_WEST:
-      vertical = MOVE_UP;
-      horizontal = MOVE_LEFT;
-      break;
+  case NORTH_WEST:
+    vertical = MOVE_UP;
+    horizontal = MOVE_LEFT;
+    break;
 
-    case SOUTH_EAST:
-      vertical = MOVE_DOWN;
-      horizontal = MOVE_RIGHT;
-      break;
+  case SOUTH_EAST:
+    vertical = MOVE_DOWN;
+    horizontal = MOVE_RIGHT;
+    break;
 
-    case SOUTH_WEST:
-      vertical = MOVE_DOWN;
-      horizontal = MOVE_LEFT;
-      break;
+  case SOUTH_WEST:
+    vertical = MOVE_DOWN;
+    horizontal = MOVE_LEFT;
+    break;
 
-    case STATIONARY:
-      return;
+  case STATIONARY:
+    return;
   }
   if (speed == FAST) {
     horizontal *= MOVE_FAST;
@@ -279,7 +283,16 @@ void moveTowards(Ship *ship) {
   move(moveDirection, FAST);
 }
 
+int cmp_ship(const void *a, const void *b) {
+  Ship *shipA = (Ship *)a;
+  Ship *shipB = (Ship *)b;
 
+  if (shipA->distance != shipB->distance)
+    return shipA->distance - shipB->distance;
+  if (shipA->health != shipB->health)
+    return shipA->health - shipB->health;
+  return 0;
+}
 
 void tactics() {
   if (ticks >= TICK_MAX) {
@@ -293,13 +306,12 @@ void tactics() {
   int i;
 
   // target to fire at.
-  Ship* target = NULL;
+  Ship *target = NULL;
 
   set_new_flag(10);
 
   nFriends = 0;
   nEnemies = 0;
-
 
   memset(enemies, 0, sizeof enemies);
   memset(friends, 0, sizeof friends);
@@ -328,7 +340,6 @@ void tactics() {
       allShips[i].type = shipType[i];
       allShips[i].health = shipHealth[i];
 
-
       if (isFriendly(i)) {
         printShip(&allShips[i]);
         printf("friend with flag: %d\n", shipFlag[i]);
@@ -337,21 +348,16 @@ void tactics() {
         friends[nFriends] = &allShips[i];
       } else {
         enemies[nEnemies] = &allShips[i];
-
-        if (target == NULL ||
-            (
-                // and it's closer
-                ((target->distance > enemies[nEnemies]->distance
-                  // or it has lower health
-                  || target->health > enemies[nEnemies]->health)))) {
-          target = enemies[nEnemies];
-        }
-
         nEnemies++;
       }
     }
   } else {
     printf("no enemies in sight\n");
+  }
+
+  if (nEnemies > 0) {
+    qsort(enemies, nEnemies, sizeof(Ship *), cmp_ship);
+    target = *enemies;
   }
 
   // Do we have an ideal ship to fire at?
@@ -361,7 +367,7 @@ void tactics() {
     moveTowards(target);
 
     if (target->distance <= FIRING_RANGE) {
-        fireAtShip(target);
+      fireAtShip(target);
     }
   } else {
     // printf("current coordinates: (%d, %d)\n", myX, myY);
@@ -426,28 +432,28 @@ void communicate_with_server() {
             chr = buffer[i];
 
             switch (chr) {
-              case '|':
-                InputBuffer[j] = '\0';
-                j = 0;
-                sscanf(InputBuffer, "%d,%d,%d,%d,%d", &shipX[number_of_ships],
-                       &shipY[number_of_ships], &shipHealth[number_of_ships],
-                       &shipFlag[number_of_ships], &shipType[number_of_ships]);
-                number_of_ships++;
-                break;
+            case '|':
+              InputBuffer[j] = '\0';
+              j = 0;
+              sscanf(InputBuffer, "%d,%d,%d,%d,%d", &shipX[number_of_ships],
+                     &shipY[number_of_ships], &shipHealth[number_of_ships],
+                     &shipFlag[number_of_ships], &shipType[number_of_ships]);
+              number_of_ships++;
+              break;
 
-              case '\0':
-                InputBuffer[j] = '\0';
-                sscanf(InputBuffer, "%d,%d,%d,%d,%d", &shipX[number_of_ships],
-                       &shipY[number_of_ships], &shipHealth[number_of_ships],
-                       &shipFlag[number_of_ships], &shipType[number_of_ships]);
-                number_of_ships++;
-                finished = true;
-                break;
+            case '\0':
+              InputBuffer[j] = '\0';
+              sscanf(InputBuffer, "%d,%d,%d,%d,%d", &shipX[number_of_ships],
+                     &shipY[number_of_ships], &shipHealth[number_of_ships],
+                     &shipFlag[number_of_ships], &shipType[number_of_ships]);
+              number_of_ships++;
+              finished = true;
+              break;
 
-              default:
-                InputBuffer[j] = chr;
-                j++;
-                break;
+            default:
+              InputBuffer[j] = chr;
+              j++;
+              break;
             }
             i++;
           }
@@ -506,10 +512,14 @@ void fire_at_ship(int X, int Y) {
 }
 
 void move_in_direction(int X, int Y) {
-  if (X < -2) X = -2;
-  if (X > 2) X = 2;
-  if (Y < -2) Y = -2;
-  if (Y > 2) Y = 2;
+  if (X < -2)
+    X = -2;
+  if (X > 2)
+    X = 2;
+  if (Y < -2)
+    Y = -2;
+  if (Y > 2)
+    Y = 2;
 
   moveShip = true;
   moveX = X;
@@ -524,9 +534,9 @@ void set_new_flag(int newFlag) {
 int main(int argc, char *argv[]) {
   char chr = '\0';
   server_ip = getenv("SERVER_IP");
-  
-  if (server_ip == NULL){
-    server_ip =default_server_ip;
+
+  if (server_ip == NULL) {
+    server_ip = default_server_ip;
   }
 
   student_id = getenv("STUDENT_ID");
@@ -535,11 +545,12 @@ int main(int argc, char *argv[]) {
     printf("ERROR: No student id provided\n");
     return -1;
   }
-  
+
   bind_ip = getenv("BIND_IP");
 
   printf("The server ip is: %s\n", server_ip);
-  printf("The client interface ip is: %s\n", bind_ip == NULL ? "0.0.0.0" : bind_ip);
+  printf("The client interface ip is: %s\n",
+         bind_ip == NULL ? "0.0.0.0" : bind_ip);
   printf("The student id is: %s\n", student_id);
 
   printf("\n");
@@ -547,19 +558,19 @@ int main(int argc, char *argv[]) {
   printf("UWE Computer and Network Systems Assignment 2 (2016-17)\n");
   printf("\n");
 
-  sock_send = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);  // Here we create our
-                                                         // socket, which will
-                                                         // be a UDP socket
-                                                         // (SOCK_DGRAM).
+  sock_send = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); // Here we create our
+                                                        // socket, which will
+                                                        // be a UDP socket
+                                                        // (SOCK_DGRAM).
   if (!sock_send) {
     printf("Socket creation failed!\n");
     return -1;
   }
 
-  sock_recv = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);  // Here we create our
-                                                         // socket, which will
-                                                         // be a UDP socket
-                                                         // (SOCK_DGRAM).
+  sock_recv = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); // Here we create our
+                                                        // socket, which will
+                                                        // be a UDP socket
+                                                        // (SOCK_DGRAM).
   if (!sock_recv) {
     printf("Socket creation failed!\n");
     return -1;
@@ -571,7 +582,8 @@ int main(int argc, char *argv[]) {
 
   receive_addr.sin_family = AF_INET;
   //	receive_addr.sin_addr.s_addr = inet_addr(IP_ADDRESS_SERVER);
-  receive_addr.sin_addr.s_addr = bind_ip == NULL ? INADDR_ANY : inet_addr(bind_ip);
+  receive_addr.sin_addr.s_addr =
+      bind_ip == NULL ? INADDR_ANY : inet_addr(bind_ip);
   receive_addr.sin_port = htons(PORT_RECEIVE);
 
   int ret = bind(sock_recv, (sockaddr *)&receive_addr, sizeof(sockaddr));
