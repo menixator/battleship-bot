@@ -119,8 +119,8 @@ struct Bearings {
 
 unsigned int ticks = 0;
 
-int up_down = MOVE_DOWN * MOVE_SLOW;
-int left_right = MOVE_RIGHT * MOVE_SLOW;
+int up_down = MOVE_DOWN * MOVE_FAST;
+int left_right = MOVE_RIGHT * MOVE_FAST;
 
 int nFriends;
 int nEnemies;
@@ -277,8 +277,9 @@ bool isCloseToEdge(Coordinates coords){
     return coords.x <= 10 || coords.x >= 980 || coords.y <= 10  || coords.y >= 980;
 }
 
+// isCoordAligned
 bool isXorYSame(Coordinates a, Coordinates b){
-    return abs(a.x-b.x) == 0 || abs(a.y-b.y) == 0 || (abs(a.x-b.x) == abs(a.y-b.y) && diff(a, b) <= 30);
+    return abs(a.x-b.x) == 0 || abs(a.y-b.y) == 0 || (abs(a.x-b.x) == abs(a.y-b.y));
 }
 
 int isCoordDangerous(Coordinates coords, Ship *ship){
@@ -293,6 +294,40 @@ int isCoordDangerous(Coordinates coords, Ship *ship){
     return dangerousCount;
 }
 
+
+
+int rate_coordinate(Coordinates coords, Ship* ship){
+    // Rating starts at 0
+    int rating = 0;
+
+    for(int i=0;i<nEnemies;i++){
+        if (enemies[i]->id == ship->id){
+
+            if (diff(coords, ship->coords) < diff(me->coords, ship->coords)){
+                rating-=500;
+            }
+            continue;
+        }
+        int pDistance = diff(me->coords, enemies[i]->coords);
+        int distance = diff(coords, enemies[i]->coords);
+
+        rating -= 4096*((VISIBLE_RANGE-distance)+enemies[i]->health);
+
+        if (distance < pDistance){ rating-= 10000;} else if (distance > pDistance ){rating += 10000;}
+
+        if ( isXorYSame(enemies[i]->coords, coords) ){
+            rating -= 100;
+        }
+    }
+
+    if (isCloseToEdge(coords)){
+        rating -= 5000;
+    }
+    //rating += (1000/1000-abs(500-coords.x)-abs(500-coords.y)) * 100;
+
+    return rating;
+}
+
 int cmp_direction(const void *a, const void *b, void *p_ship){
   NAMED_BEARING bearingA = *(NAMED_BEARING*) a;
   NAMED_BEARING bearingB = *(NAMED_BEARING*) b;
@@ -300,50 +335,13 @@ int cmp_direction(const void *a, const void *b, void *p_ship){
   Coordinates coordA, coordB;
   getNewCoordinate(&coordA, bearingA, FAST);
   getNewCoordinate(&coordB, bearingB, FAST);
- 
-  int isADangerous = isCoordDangerous(coordA, ship);
-  int isBDangerous = isCoordDangerous(coordB, ship);
-  if (isADangerous < isBDangerous) return -1;
-  if (isADangerous > isBDangerous) return 1;
+  int bRating = rate_coordinate(coordB, ship);
+  int aRating = rate_coordinate(coordA, ship);
 
-  if (isCloseToEdge(coordA) && !isCloseToEdge(coordB)) return 1;
-  if (!isCloseToEdge(coordA) && isCloseToEdge(coordB)) return -1;
-
-  if (isXorYSame(coordA, ship->coords) && !isXorYSame(coordB, ship->coords)){
-    return -1;
-  }
-  
-  if (!isXorYSame(coordA, ship->coords) && isXorYSame(coordB, ship->coords)){
-    return 1;
-  }
-
-
-  int diffA= diff(ship->coords, coordA);
-  int diffB= diff(ship->coords, coordB);
- 
-  // If both directions doesn't land me in the firing range
-  // Choose whichever brings me closer to the target. 
-
-  if (diffA == HOVER_RANGE && diffB != HOVER_RANGE) return -1;
-  if (diffB == HOVER_RANGE && diffA != HOVER_RANGE) return 1;
-
-  if (diffA > HOVER_RANGE && diffB > HOVER_RANGE){
-    return diffA - diffB;
-  }
-  
-  if (diffA <= HOVER_RANGE && diffB <= HOVER_RANGE){
-      return -1;
-  }
-  
-  if (diffA <= HOVER_RANGE && diffB > HOVER_RANGE){
-    return 1;
-  }
-  
-  if (diffB <= HOVER_RANGE && diffA > HOVER_RANGE){
-    return -1;
-  }
-  return -1;
+  // if a less mean big
+  return bRating - aRating;
 }
+
 
 
 
