@@ -182,8 +182,7 @@ int bearings[] = {
 // Function definitions.
 void fireAtShip(Ship *ship);
 void printShip(Ship *ship);
-NAMED_BEARING getNamedBearings(Coordinates to, Coordinates from);
-NAMED_BEARING getNamedBearingsToShip(Ship *to, Ship *from);
+
 void fireAt(Coordinates coords) { fire_at_ship(coords.x, coords.y); }
 void fireAtShip(Ship *ship) { fire_at_ship(ship->coords.x, ship->coords.y); }
 
@@ -193,49 +192,57 @@ void printShip(Ship *ship) {
          ship->distance);
 }
 
-NAMED_BEARING getNamedBearings(Coordinates to, Coordinates from) {
-  // If x coordinates are the same, it's either south or north
-  if (from.x == to.x) {
-    if (from.y > to.y)
-      return SOUTH;
-    if (from.y < to.y)
-      return NORTH;
-  } else if (from.y == to.y) {
-    if (from.x > to.x)
-      return WEST;
-    if (from.x < to.x)
-      return EAST;
-  } else if (to.x > from.x) {
-    if (to.y > from.y)
-      return NORTH_EAST;
-    if (to.y < from.y)
-      return SOUTH_EAST;
-  } else if (to.x < from.x) {
-    if (to.y > from.y)
-      return NORTH_WEST;
-    if (to.y < from.y)
-      return SOUTH_WEST;
-    return STATIONARY;
-  }
-}
-
-NAMED_BEARING getNamedBearingsToShip(Ship *to, Ship *from) {
-  return getNamedBearings(to->coords, from->coords);
-}
-
-NAMED_BEARING jiggle(NAMED_BEARING dir) {
-  switch (dir) {
+int namedBearingToBearings(Bearings *bearing, NAMED_BEARING namedBearing, SPEED speed){
+  int vertical = 0;
+  int horizontal = 0;
+  switch (namedBearing) {
   case NORTH:
-    return ticks % JIGGLE_DELTA == 0 ? NORTH_EAST : NORTH_WEST;
+    vertical = MOVE_UP;
+    break;
+
   case SOUTH:
-    return ticks % JIGGLE_DELTA == 0 ? SOUTH_EAST : SOUTH_WEST;
+    vertical = MOVE_DOWN;
+    break;
+
   case EAST:
-    return ticks % JIGGLE_DELTA == 0 ? NORTH_EAST : SOUTH_EAST;
+    horizontal = MOVE_RIGHT;
+    break;
+
   case WEST:
-    return ticks % JIGGLE_DELTA == 0 ? NORTH_WEST : SOUTH_WEST;
+    horizontal = MOVE_LEFT;
+    break;
+
+  case NORTH_EAST:
+    vertical = MOVE_UP;
+    horizontal = MOVE_RIGHT;
+    break;
+
+  case NORTH_WEST:
+    vertical = MOVE_UP;
+    horizontal = MOVE_LEFT;
+    break;
+
+  case SOUTH_EAST:
+    vertical = MOVE_DOWN;
+    horizontal = MOVE_RIGHT;
+    break;
+
+  case SOUTH_WEST:
+    vertical = MOVE_DOWN;
+    horizontal = MOVE_LEFT;
+    break;
+
+  case STATIONARY:
+    break;
   }
-  return dir;
+  bearing->vBearing = (BEARING)vertical;
+  bearing->hBearing = (BEARING)horizontal;
+
+  bearing->vSpeed = (SPEED)speed;
+  bearing->hSpeed = (SPEED)speed;
+  return 0;
 }
+
 
 void move(NAMED_BEARING namedBearing, SPEED speed) {
   int vertical = 0;
@@ -520,7 +527,6 @@ void communicate_with_server() {
     if (recvfrom(sock_recv, buffer, sizeof(buffer) - 1, 0,
                  (sockaddr *)&receive_addr, (socklen_t *)&len)) {
       p = ::inet_ntoa(receive_addr.sin_addr);
-      printf("recieved '%s' from '%s'\n", buffer, p);
 
       if ((strcmp(IP_ADDRESS_SERVER, "127.0.0.1") == 0) ||
           (strcmp(IP_ADDRESS_SERVER, p) == 0)) {
