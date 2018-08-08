@@ -553,6 +553,7 @@ int main(int argc, char *argv[]) {
                                                          // (SOCK_DGRAM).
   if (!sock_send) {
     printf("Socket creation failed!\n");
+    return -1;
   }
 
   sock_recv = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);  // Here we create our
@@ -561,6 +562,7 @@ int main(int argc, char *argv[]) {
                                                          // (SOCK_DGRAM).
   if (!sock_recv) {
     printf("Socket creation failed!\n");
+    return -1;
   }
 
   sendto_addr.sin_family = AF_INET;
@@ -575,6 +577,8 @@ int main(int argc, char *argv[]) {
   int ret = bind(sock_recv, (sockaddr *)&receive_addr, sizeof(sockaddr));
   //	int ret = bind(sock_send, (sockaddr *)&receive_addr, sizeof(sockaddr));
   if (ret) {
+    printf("Socket bind failed!");
+    return -1;
   }
 
   communicate_with_server();
