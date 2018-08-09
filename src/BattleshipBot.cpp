@@ -282,14 +282,12 @@ int getNewCoordinate(Coordinates *coords, NAMED_BEARING namedBearing,
   return 0;
 }
 
-#define HOVER_RANGE 10 + ((me->health / 10) * 50)
 
 bool isCloseToEdge(Coordinates coords) {
   return coords.x <= 10 || coords.x >= 980 || coords.y <= 10 || coords.y >= 980;
 }
 
-// isCoordAligned
-bool isXorYSame(Coordinates a, Coordinates b) {
+bool isAligned(Coordinates a, Coordinates b) {
   return abs(a.x - b.x) == 0 || abs(a.y - b.y) == 0 ||
          (abs(a.x - b.x) == abs(a.y - b.y));
 }
@@ -318,7 +316,7 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
       rating += 10000;
     }
 
-    if (isXorYSame(enemies[i]->coords, coords)) {
+    if (isAligned(enemies[i]->coords, coords)) {
       rating -= 100;
     }
   }
@@ -345,7 +343,6 @@ int cmp_direction(const void *a, const void *b, void *p_ship) {
   int bRating = rate_coordinate(bearingB, coordB, ship);
   int aRating = rate_coordinate(bearingA, coordA, ship);
 
-  // if a less mean big
   return bRating - aRating;
 }
 
