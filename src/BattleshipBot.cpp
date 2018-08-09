@@ -294,18 +294,6 @@ bool isXorYSame(Coordinates a, Coordinates b) {
          (abs(a.x - b.x) == abs(a.y - b.y));
 }
 
-int isCoordDangerous(Coordinates coords, Ship *ship) {
-  int dangerousCount = 0;
-
-  for (int i = 0; i < nEnemies; i++) {
-    if (enemies[i]->id == ship->id)
-      continue;
-    if (diff(coords, enemies[i]->coords) <= 80) {
-      dangerousCount++;
-    }
-  }
-  return dangerousCount;
-}
 
 int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
   // Rating starts at 0
