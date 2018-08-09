@@ -110,7 +110,9 @@ void set_new_flag(int newFlag);
 #if DEBUG
 #define DEBUG_FILE "debug.log"
 FILE* debug_fd;
-#define debug(...) do { fprintf(debug_fd, __VA_ARGS__);fprintf(debug_fd, "\n"); fflush(debug_fd);} while(0)
+#define debug(...) do { fprintf(debug_fd, __VA_ARGS__); printf(__VA_ARGS__); fflush(debug_fd);} while(0)
+#else
+#define debug(...) do {} while(0)
 #endif
 
 enum SPEED { SLOW, REST, FAST };
@@ -195,13 +197,13 @@ void printShip(Ship *ship);
 
 void fireAt(Coordinates coords) { fire_at_ship(coords.x, coords.y); }
 void fireAtShip(Ship *ship) {
-    printf("Firing at: ");
+    debug("Firing at: ");
     printShip(ship);
     fire_at_ship(ship->coords.x, ship->coords.y);
 }
 
 void printShip(Ship *ship) {
-  printf("Ship{x=%d, y=%d, health=%d, flag=%d, type=%d, distance=%d}\n",
+  debug("Ship{x=%d, y=%d, health=%d, flag=%d, type=%d, distance=%d}\n",
          ship->coords.x, ship->coords.y, ship->health, ship->flag, ship->type,
          ship->distance);
 }
@@ -259,7 +261,7 @@ int namedBearingToBearings(Bearings *bearing, NAMED_BEARING namedBearing, SPEED 
 
 
 void move(Bearings bearings) {
-    printf("Moving X: %d, Y: %d\n",bearings.hBearing*bearings.hSpeed, bearings.vBearing*bearings.vSpeed);
+    debug("Moving X: %d, Y: %d\n",bearings.hBearing*bearings.hSpeed, bearings.vBearing*bearings.vSpeed);
   move_in_direction(bearings.hBearing*bearings.hSpeed, bearings.vBearing*bearings.vSpeed);
 }
 
@@ -392,7 +394,7 @@ void tactics() {
     ticks++;
   }
 
-  printf("tick: %d\n", ticks);
+  debug("tick: %d\n", ticks);
 
   int i;
 
@@ -416,10 +418,11 @@ void tactics() {
   allShips->health = myHealth;
 
   me = allShips;
-
+  debug("Me: ");
+  printShip(me);
   
   if (number_of_ships > 1) {
-    printf("more than one ship visible\n");
+    debug("more than one ship visible\n");
     for (i = 1; i < number_of_ships; i++) {
       // Initialize struct
       allShips[i].id = i;
@@ -431,22 +434,24 @@ void tactics() {
       allShips[i].health = shipHealth[i];
 
       if (isFriendly(i)) {
+        debug("ALLY: ");
         printShip(&allShips[i]);
-
         nFriends++;
         friends[nFriends] = &allShips[i];
       } else {
+        debug("ENEMY: ");
+        printShip(&allShips[i]);
         enemies[nEnemies] = &allShips[i];
         nEnemies++;
       }
     }
 
   } else {
-    printf("no ships visible\n");
+    debug("no ships visible\n");
   }
   
   if (nEnemies > 0) {
-    printf("sorting enemies\n");
+    debug("sorting enemies\n");
     // Sort enemies.
     // nEnemies: sizeof array
     // sizeof(Ship*): enemies is a pointer array
@@ -456,7 +461,7 @@ void tactics() {
 
   // Do we have an ideal ship to fire at?
   if (target != NULL) {
-    printf("target selected\n");
+    debug("target selected\n");
     printShip(target);
     moveTowards(target);
 
@@ -464,13 +469,13 @@ void tactics() {
       fireAtShip(target);
     }
   } else {
-    printf("there wasn't any target\n");
+    debug("there wasn't any target\n");
     moveTowards(target);
   }
 
 }
 
-void messageReceived(char *msg) { printf("message recieved: '%s'\n", msg); }
+void messageReceived(char *msg) { debug("message recieved: '%s'\n", msg); }
 
 /*************************************************************/
 /********* Your tactics code ends here ***********************/
@@ -631,10 +636,10 @@ int main(int argc, char *argv[]) {
 
   bind_ip = getenv("BIND_IP");
 
-  printf("The server ip is: %s\n", server_ip);
-  printf("The client interface ip is: %s\n",
-         bind_ip == NULL ? "0.0.0.0" : bind_ip);
-  printf("The student id is: %s\n", student_id);
+  debug("The server ip is: %s\n", server_ip);
+  debug("The client interface ip is: %s\n",
+   bind_ip == NULL ? "0.0.0.0" : bind_ip);
+  debug("The student id is: %s\n", student_id);
 
   printf("\n");
   printf("Battleship Bots\n");
