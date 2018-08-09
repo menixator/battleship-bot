@@ -119,8 +119,6 @@ struct Bearings {
 
 unsigned int ticks = 0;
 
-int up_down = MOVE_DOWN * MOVE_FAST;
-int left_right = MOVE_RIGHT * MOVE_FAST;
 
 int nFriends;
 int nEnemies;
@@ -157,6 +155,8 @@ bool isFriendly(int index) {
 #endif
 }
 
+
+
 // Setup simpler directions.
 enum NAMED_BEARING {
   STATIONARY,
@@ -169,6 +169,8 @@ enum NAMED_BEARING {
   SOUTH_EAST,
   SOUTH_WEST
 };
+
+NAMED_BEARING last_bearings = STATIONARY;
 
 NAMED_BEARING bearings[] = {
   NORTH,
@@ -296,12 +298,12 @@ int isCoordDangerous(Coordinates coords, Ship *ship){
 
 
 
-int rate_coordinate(Coordinates coords, Ship* ship){
+int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship* ship){
     // Rating starts at 0
     int rating = 0;
 
     for(int i=0;i<nEnemies;i++){
-        if (enemies[i]->id == ship->id){
+        if (ship != NULL && enemies[i]->id == ship->id){
 
             if (diff(coords, ship->coords) < diff(me->coords, ship->coords)){
                 rating-=500;
@@ -323,7 +325,11 @@ int rate_coordinate(Coordinates coords, Ship* ship){
     if (isCloseToEdge(coords)){
         rating -= 5000;
     }
-    //rating += (1000/1000-abs(500-coords.x)-abs(500-coords.y)) * 100;
+    
+    if (last_bearings != STATIONARY && last_bearings == bearing){
+        rating += 2500;
+    }
+    rating += 5*(1000-abs(500-coords.x)-abs(500-coords.y));
 
     return rating;
 }
@@ -335,8 +341,8 @@ int cmp_direction(const void *a, const void *b, void *p_ship){
   Coordinates coordA, coordB;
   getNewCoordinate(&coordA, bearingA, FAST);
   getNewCoordinate(&coordB, bearingB, FAST);
-  int bRating = rate_coordinate(coordB, ship);
-  int aRating = rate_coordinate(coordA, ship);
+  int bRating = rate_coordinate(bearingB, coordB, ship);
+  int aRating = rate_coordinate(bearingA, coordA, ship);
 
   // if a less mean big
   return bRating - aRating;
@@ -346,9 +352,14 @@ int cmp_direction(const void *a, const void *b, void *p_ship){
 
 
 void moveTowards(Ship *ship) {
-  printShip(ship);
+  if(ship != NULL){ 
+    printShip(ship);
+  }
   qsort_r(bearings, sizeof(bearings)/sizeof(*bearings), sizeof(bearings[0]), cmp_direction, ( void*)ship);
+
   Bearings new_bearings;
+  last_bearings = bearings[0];
+
   namedBearingToBearings(&new_bearings, *bearings, FAST);
   move(new_bearings);
 }
@@ -448,22 +459,7 @@ void tactics() {
     }
   } else {
     printf("there wasn't any target\n");
-    if (myY > 900) {
-      up_down = MOVE_DOWN * MOVE_FAST;
-    }
-
-    if (myX < 200) {
-      left_right = MOVE_RIGHT * MOVE_FAST;
-    }
-
-    if (myY < 100) {
-      up_down = MOVE_UP * MOVE_FAST;
-    }
-
-    if (myX > 800) {
-      left_right = MOVE_LEFT * MOVE_FAST;
-    }
-    move_in_direction(left_right, up_down);
+    moveTowards(target);
   }
 
 }
