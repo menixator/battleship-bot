@@ -12,7 +12,6 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h> //write
-#pragma comment(lib, "wsock32.lib")
 
 #define SHIPTYPE_BATTLESHIP "0"
 #define SHIPTYPE_FRIGATE "1"
@@ -471,7 +470,6 @@ void communicate_with_server() {
   bool finished;
   int i;
   int j;
-  int rc;
   char *p;
 
   sprintf(buffer, "Register  %s,%s,%s,%s", STUDENT_NUMBER, STUDENT_FIRSTNAME,
@@ -546,7 +544,7 @@ void communicate_with_server() {
 
         if (moveShip) {
           sprintf(buffer, "Move %s,%d,%d", STUDENT_NUMBER, moveX, moveY);
-          rc = sendto(sock_send, buffer, strlen(buffer), 0,
+          sendto(sock_send, buffer, strlen(buffer), 0,
                       (sockaddr *)&sendto_addr, sizeof(sockaddr));
           moveShip = false;
         }
