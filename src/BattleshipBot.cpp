@@ -5,15 +5,14 @@
 #include <math.h>
 
 #include <arpa/inet.h> //inet_addr
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h> //write
-#include <assert.h>
 #pragma comment(lib, "wsock32.lib")
-
 
 #define SHIPTYPE_BATTLESHIP "0"
 #define SHIPTYPE_FRIGATE "1"
@@ -27,7 +26,7 @@
 //#define IP_ADDRESS_SERVER "127.0.0.1"
 #define IP_ADDRESS_SERVER server_ip
 
-#define PORT_SEND 1924   // Port to send data to
+#define PORT_SEND 1924    // Port to send data to
 #define PORT_RECEIVE 1925 // Port to recieve data from
 
 #define MAX_BUFFER_SIZE 500
@@ -109,10 +108,17 @@ void set_new_flag(int newFlag);
 
 #if DEBUG
 #define DEBUG_FILE "debug.log"
-FILE* debug_fd;
-#define debug(...) do { fprintf(debug_fd, __VA_ARGS__); printf(__VA_ARGS__); fflush(debug_fd);} while(0)
+FILE *debug_fd;
+#define debug(...)                                                             \
+  do {                                                                         \
+    fprintf(debug_fd, __VA_ARGS__);                                            \
+    printf(__VA_ARGS__);                                                       \
+    fflush(debug_fd);                                                          \
+  } while (0)
 #else
-#define debug(...) do {} while(0)
+#define debug(...)                                                             \
+  do {                                                                         \
+  } while (0)
 #endif
 
 enum SPEED { SLOW, REST, FAST };
@@ -126,7 +132,6 @@ struct Bearings {
 };
 
 unsigned int ticks = 0;
-
 
 int nFriends;
 int nEnemies;
@@ -163,8 +168,6 @@ bool isFriendly(int index) {
 #endif
 }
 
-
-
 // Setup simpler directions.
 enum NAMED_BEARING {
   STATIONARY,
@@ -180,16 +183,8 @@ enum NAMED_BEARING {
 
 NAMED_BEARING last_bearings = STATIONARY;
 
-NAMED_BEARING bearings[] = {
-  NORTH,
-  SOUTH,
-  EAST,
-  WEST,
-  NORTH_EAST,
-  NORTH_WEST,
-  SOUTH_EAST,
-  SOUTH_WEST
-};
+NAMED_BEARING bearings[] = {NORTH,      SOUTH,      EAST,       WEST,
+                            NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST};
 
 // Function definitions.
 void fireAtShip(Ship *ship);
@@ -197,22 +192,24 @@ void printShip(Ship *ship);
 
 void fireAt(Coordinates coords) { fire_at_ship(coords.x, coords.y); }
 void fireAtShip(Ship *ship) {
-    debug("Firing at: ");
-    printShip(ship);
-    fire_at_ship(ship->coords.x, ship->coords.y);
+  debug("Firing at: ");
+  printShip(ship);
+  fire_at_ship(ship->coords.x, ship->coords.y);
 }
 
 void printShip(Ship *ship) {
   debug("Ship{x=%d, y=%d, health=%d, flag=%d, type=%d, distance=%d}\n",
-         ship->coords.x, ship->coords.y, ship->health, ship->flag, ship->type,
-         ship->distance);
+        ship->coords.x, ship->coords.y, ship->health, ship->flag, ship->type,
+        ship->distance);
 }
 
-void printBearings(Bearings bearings){
-  debug("Bearings{horizontal=%d, vertical=%d, hSpeed=%d, vSpeed=%d}\n", bearings.hBearing, bearings.vBearing, bearings.hSpeed, bearings.vSpeed);
+void printBearings(Bearings bearings) {
+  debug("Bearings{horizontal=%d, vertical=%d, hSpeed=%d, vSpeed=%d}\n",
+        bearings.hBearing, bearings.vBearing, bearings.hSpeed, bearings.vSpeed);
 }
 
-int namedBearingToBearings(Bearings *bearing, NAMED_BEARING namedBearing, SPEED speed){
+int namedBearingToBearings(Bearings *bearing, NAMED_BEARING namedBearing,
+                           SPEED speed) {
   int vertical = 0;
   int horizontal = 0;
   switch (namedBearing) {
@@ -263,93 +260,97 @@ int namedBearingToBearings(Bearings *bearing, NAMED_BEARING namedBearing, SPEED 
   return 0;
 }
 
-
 void move(Bearings bearings) {
   printBearings(bearings);
-  move_in_direction(bearings.hBearing*bearings.hSpeed, bearings.vBearing*bearings.vSpeed);
+  move_in_direction(bearings.hBearing * bearings.hSpeed,
+                    bearings.vBearing * bearings.vSpeed);
 }
 
-
-int diff( Coordinates a, Coordinates b){
-  int ret = (int) sqrt( (a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y) );
+int diff(Coordinates a, Coordinates b) {
+  int ret = (int)sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
   assert(ret >= 0);
   return ret;
 }
 
-int getNewCoordinate(Coordinates *coords, NAMED_BEARING namedBearing, SPEED speed) {
+int getNewCoordinate(Coordinates *coords, NAMED_BEARING namedBearing,
+                     SPEED speed) {
   Bearings bearings;
   namedBearingToBearings(&bearings, namedBearing, speed);
 
-  coords->x = me->coords.x + bearings.hBearing*bearings.hSpeed;
-  coords->y = me->coords.y + bearings.vBearing*bearings.vSpeed;
+  coords->x = me->coords.x + bearings.hBearing * bearings.hSpeed;
+  coords->y = me->coords.y + bearings.vBearing * bearings.vSpeed;
   return 0;
 }
 
-#define HOVER_RANGE 10+((me->health/10)*50)
+#define HOVER_RANGE 10 + ((me->health / 10) * 50)
 
-bool isCloseToEdge(Coordinates coords){
-    return coords.x <= 10 || coords.x >= 980 || coords.y <= 10  || coords.y >= 980;
+bool isCloseToEdge(Coordinates coords) {
+  return coords.x <= 10 || coords.x >= 980 || coords.y <= 10 || coords.y >= 980;
 }
 
 // isCoordAligned
-bool isXorYSame(Coordinates a, Coordinates b){
-    return abs(a.x-b.x) == 0 || abs(a.y-b.y) == 0 || (abs(a.x-b.x) == abs(a.y-b.y));
+bool isXorYSame(Coordinates a, Coordinates b) {
+  return abs(a.x - b.x) == 0 || abs(a.y - b.y) == 0 ||
+         (abs(a.x - b.x) == abs(a.y - b.y));
 }
 
-int isCoordDangerous(Coordinates coords, Ship *ship){
-    int dangerousCount = 0;
+int isCoordDangerous(Coordinates coords, Ship *ship) {
+  int dangerousCount = 0;
 
-    for(int i=0;i<nEnemies;i++){
-        if (enemies[i]->id == ship->id) continue;
-        if (diff(coords, enemies[i]->coords) <= 80){
-            dangerousCount++;
-        }
+  for (int i = 0; i < nEnemies; i++) {
+    if (enemies[i]->id == ship->id)
+      continue;
+    if (diff(coords, enemies[i]->coords) <= 80) {
+      dangerousCount++;
     }
-    return dangerousCount;
+  }
+  return dangerousCount;
 }
 
+int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
+  // Rating starts at 0
+  int rating = 0;
 
+  for (int i = 0; i < nEnemies; i++) {
+    int pDistance = diff(me->coords, enemies[i]->coords);
+    int distance = diff(coords, enemies[i]->coords);
 
-int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship* ship){
-    // Rating starts at 0
-    int rating = 0;
+    if (ship != NULL && enemies[i]->id == ship->id) {
 
-    for(int i=0;i<nEnemies;i++){
-        int pDistance = diff(me->coords, enemies[i]->coords);
-        int distance = diff(coords, enemies[i]->coords);
+      if (diff(coords, ship->coords) < diff(me->coords, ship->coords)) {
+        rating += 4096 * ((VISIBLE_RANGE - distance) + enemies[i]->health);
+      }
+      continue;
+    }
+    rating -= 4096 * ((VISIBLE_RANGE - distance) + enemies[i]->health);
 
-        if (ship != NULL && enemies[i]->id == ship->id){
-
-            if (diff(coords, ship->coords) < diff(me->coords, ship->coords)){
-              rating += 4096*((VISIBLE_RANGE-distance)+enemies[i]->health);
-            }
-            continue;
-        }
-        rating -= 4096*((VISIBLE_RANGE-distance)+enemies[i]->health);
-
-        if (distance < pDistance){ rating-= 10000;} else if (distance > pDistance ){rating += 10000;}
-
-        if ( isXorYSame(enemies[i]->coords, coords) ){
-            rating -= 100;
-        }
+    if (distance < pDistance) {
+      rating -= 10000;
+    } else if (distance > pDistance) {
+      rating += 10000;
     }
 
-    if (isCloseToEdge(coords)){
-        rating -= 5000;
+    if (isXorYSame(enemies[i]->coords, coords)) {
+      rating -= 100;
     }
-    
-    if (last_bearings != STATIONARY && last_bearings == bearing){
-        rating += 7500;
-    }
-    rating += 5*(1000-abs(500-coords.x)-abs(500-coords.y));
+  }
 
-    return rating;
+  if (isCloseToEdge(coords)) {
+    rating -= 5000;
+  }
+
+  if (last_bearings != STATIONARY && last_bearings == bearing) {
+    rating += 7500;
+  }
+  rating += 5 * (1000 - abs(500 - coords.x) - abs(500 - coords.y));
+
+  return rating;
 }
 
-int cmp_direction(const void *a, const void *b, void *p_ship){
-  NAMED_BEARING bearingA = *(NAMED_BEARING*) a;
-  NAMED_BEARING bearingB = *(NAMED_BEARING*) b;
-  Ship *ship = (Ship*) p_ship;
+int cmp_direction(const void *a, const void *b, void *p_ship) {
+  NAMED_BEARING bearingA = *(NAMED_BEARING *)a;
+  NAMED_BEARING bearingB = *(NAMED_BEARING *)b;
+  Ship *ship = (Ship *)p_ship;
   Coordinates coordA, coordB;
   getNewCoordinate(&coordA, bearingA, FAST);
   getNewCoordinate(&coordB, bearingB, FAST);
@@ -360,14 +361,12 @@ int cmp_direction(const void *a, const void *b, void *p_ship){
   return bRating - aRating;
 }
 
-
-
-
 void moveTowards(Ship *ship) {
-  if(ship != NULL){ 
+  if (ship != NULL) {
     printShip(ship);
   }
-  qsort_r(bearings, sizeof(bearings)/sizeof(*bearings), sizeof(bearings[0]), cmp_direction, ( void*)ship);
+  qsort_r(bearings, sizeof(bearings) / sizeof(*bearings), sizeof(bearings[0]),
+          cmp_direction, (void *)ship);
 
   Bearings new_bearings;
   last_bearings = bearings[0];
@@ -375,9 +374,6 @@ void moveTowards(Ship *ship) {
   namedBearingToBearings(&new_bearings, *bearings, FAST);
   move(new_bearings);
 }
-
-
-
 
 int cmp_ship(const void *a, const void *b) {
   Ship *shipA = (Ship *)a;
@@ -405,7 +401,6 @@ void tactics() {
   // target to fire at.
   Ship *target = NULL;
 
-
   nFriends = 0;
   nEnemies = 0;
 
@@ -424,7 +419,7 @@ void tactics() {
   me = allShips;
   debug("Me: ");
   printShip(me);
-  
+
   if (number_of_ships > 1) {
     debug("more than one ship visible\n");
     for (i = 1; i < number_of_ships; i++) {
@@ -453,7 +448,7 @@ void tactics() {
   } else {
     debug("no ships visible\n");
   }
-  
+
   if (nEnemies > 0) {
     debug("sorting enemies\n");
     // Sort enemies.
@@ -476,7 +471,6 @@ void tactics() {
     debug("there wasn't any target\n");
     moveTowards(target);
   }
-
 }
 
 void messageReceived(char *msg) { debug("message recieved: '%s'\n", msg); }
@@ -582,7 +576,6 @@ void communicate_with_server() {
     } else {
     }
   }
-
 }
 
 void send_message(char *dest, char *source, char *msg) {
@@ -619,7 +612,7 @@ void set_new_flag(int newFlag) {
 int main(int argc, char *argv[]) {
 #if DEBUG
   debug_fd = fopen(DEBUG_FILE, "w+");
-  if (debug_fd == NULL){
+  if (debug_fd == NULL) {
     printf("ERROR: couldn't open debug file\n");
     return -1;
   }
@@ -642,7 +635,7 @@ int main(int argc, char *argv[]) {
 
   debug("The server ip is: %s\n", server_ip);
   debug("The client interface ip is: %s\n",
-   bind_ip == NULL ? "0.0.0.0" : bind_ip);
+        bind_ip == NULL ? "0.0.0.0" : bind_ip);
   debug("The student id is: %s\n", student_id);
 
   printf("\n");
@@ -674,7 +667,7 @@ int main(int argc, char *argv[]) {
 
   receive_addr.sin_family = AF_INET;
   //	receive_addr.sin_addr.s_addr = inet_addr(IP_ADDRESS_SERVER);
-  receive_addr.sin_addr.s_addr =INADDR_ANY;
+  receive_addr.sin_addr.s_addr = INADDR_ANY;
   receive_addr.sin_port = htons(PORT_RECEIVE);
 
   int ret = bind(sock_recv, (sockaddr *)&receive_addr, sizeof(sockaddr));
