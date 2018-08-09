@@ -208,6 +208,10 @@ void printShip(Ship *ship) {
          ship->distance);
 }
 
+void printBearings(Bearings bearings){
+  debug("Bearings{horizontal=%d, vertical=%d, hSpeed=%d, vSpeed=%d}\n", bearings.hBearing, bearings.vBearing, bearings.hSpeed, bearings.vSpeed);
+}
+
 int namedBearingToBearings(Bearings *bearing, NAMED_BEARING namedBearing, SPEED speed){
   int vertical = 0;
   int horizontal = 0;
@@ -261,7 +265,7 @@ int namedBearingToBearings(Bearings *bearing, NAMED_BEARING namedBearing, SPEED 
 
 
 void move(Bearings bearings) {
-    debug("Moving X: %d, Y: %d\n",bearings.hBearing*bearings.hSpeed, bearings.vBearing*bearings.vSpeed);
+  printBearings(bearings);
   move_in_direction(bearings.hBearing*bearings.hSpeed, bearings.vBearing*bearings.vSpeed);
 }
 
