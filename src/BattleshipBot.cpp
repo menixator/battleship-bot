@@ -12,7 +12,6 @@
 #include <sys/types.h>
 #include <unistd.h> //write
 #include <assert.h>
-
 #pragma comment(lib, "wsock32.lib")
 
 
@@ -95,6 +94,7 @@ void set_new_flag(int newFlag);
 #define MY_FLAG 10;
 #define FIRING_RANGE 100
 #define PARANOID 1
+#define DEBUG 1
 #define VISIBLE_RANGE 200
 #define JIGGLE_DELTA 3
 #define TICK_MAX 1024
@@ -106,6 +106,12 @@ void set_new_flag(int newFlag);
 #define MIN_Y 5;
 #define MAX_X 995;
 #define MAX_Y 995;
+
+#if DEBUG
+#define DEBUG_FILE "debug.log"
+FILE* debug_fd;
+#define debug(...) do { fprintf(debug_fd, __VA_ARGS__);fprintf(debug_fd, "\n"); fflush(debug_fd);} while(0)
+#endif
 
 enum SPEED { SLOW, REST, FAST };
 enum BEARING { POS, NEG, ZERO };
@@ -602,6 +608,13 @@ void set_new_flag(int newFlag) {
 }
 
 int main(int argc, char *argv[]) {
+#if DEBUG
+  debug_fd = fopen(DEBUG_FILE, "w+");
+  if (debug_fd == NULL){
+    printf("ERROR: couldn't open debug file\n");
+    return -1;
+  }
+#endif
   char chr = '\0';
   server_ip = getenv("SERVER_IP");
 
