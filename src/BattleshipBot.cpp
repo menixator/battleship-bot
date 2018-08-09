@@ -303,16 +303,16 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship* ship){
     int rating = 0;
 
     for(int i=0;i<nEnemies;i++){
-        if (ship != NULL && enemies[i]->id == ship->id){
-
-            if (diff(coords, ship->coords) < diff(me->coords, ship->coords)){
-                rating-=500;
-            }
-            continue;
-        }
         int pDistance = diff(me->coords, enemies[i]->coords);
         int distance = diff(coords, enemies[i]->coords);
 
+        if (ship != NULL && enemies[i]->id == ship->id){
+
+            if (diff(coords, ship->coords) < diff(me->coords, ship->coords)){
+              rating += 4096*((VISIBLE_RANGE-distance)+enemies[i]->health);
+            }
+            continue;
+        }
         rating -= 4096*((VISIBLE_RANGE-distance)+enemies[i]->health);
 
         if (distance < pDistance){ rating-= 10000;} else if (distance > pDistance ){rating += 10000;}
@@ -327,7 +327,7 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship* ship){
     }
     
     if (last_bearings != STATIONARY && last_bearings == bearing){
-        rating += 2500;
+        rating += 7500;
     }
     rating += 5*(1000-abs(500-coords.x)-abs(500-coords.y));
 
