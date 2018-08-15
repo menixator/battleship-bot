@@ -140,7 +140,7 @@ struct Bearings {
   SPEED vSpeed;
 };
 
-unsigned int ticks = -1;
+unsigned int ticks = 0;
 
 int nFriends;
 int nEnemies;
@@ -171,11 +171,16 @@ bool messageRecievedFromAlsan = false;
 
 // Returns if the ship at index is a friendly
 bool isFriendly(int index) {
+    if (messageRecievedFromAlsan && abs(alsan.coords.x-allShips[index].coords.x) <= 4 && abs(alsan.coords.y - allShips[index].coords.y) <= 4 && allShips[index].flag == MY_FLAG){
+        debug("ALSAN is at: (%d, %d)\n", alsan.coords.x, alsan.coords.y);
+        debug("DIFF: (%d, %d)\n", alsan.coords.x-allShips[index].coords.x, alsan.coords.y-allShips[index].coords.y);
+    }
+
 // Paranoid mode for testing.
 #if PARANOID
   return false;
 #else
-  return messageRecievedFromAlsan && abs(alsan.coords.x-allShips[index].coords.x) <= 4 && abs(alsan.coords.y - allShips[index].coords.y) <= 4 && allShips[index].flag == MY_FLAG;
+  return messageRecievedFromAlsan && abs(alsan.coords.x-allShips[index].coords.x) <= 3 && abs(alsan.coords.y - allShips[index].coords.y) <= 3 && allShips[index].flag == MY_FLAG;
 #endif
 }
 
@@ -359,10 +364,15 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
     }
   }
 
-  if (isCloseToEdge(coords)){
-    rating -= 50000;
-  }
-  rating += 1000 *(1000 - abs(500 - coords.x) - abs(500 - coords.y));
+  // if (isCloseToEdge(coords)){
+  //  rating -= 50000;
+  //}
+  Coordinates center;
+  center.x = 500;
+  center.y = 500;
+
+  debug("distance from center: %d\n", diff(coords, center));
+  rating -= 1000*diff(coords, center);
 
   return rating;
 }
@@ -392,6 +402,7 @@ int cmp_direction(const void *a, const void *b, void *p_ship) {
 
 void moveTowards(Ship *ship) {
   if (ship != NULL) {
+    debug("\tMoving Towards: ");
     printShip(ship);
   }
   qsort_r(bearings, sizeof(bearings)/sizeof(*bearings), sizeof(bearings[0]),
@@ -408,8 +419,6 @@ void moveTowards(Ship *ship) {
 int rate_ship(Ship* ship){
     int rating = 0;
     int distance;
-    
-    printShip(ship);
 
     for (int i=1;i<number_of_ships;i++){
         if (allShips[i].id == ship->id || isFriendly(i)) continue;
@@ -433,9 +442,8 @@ int cmp_ship(const void *a, const void *b) {
 void tactics() {
   if (ticks >= TICK_MAX) {
     ticks %= TICK_MAX;
-  } else {
-    ticks++;
-  }
+  } 
+  ticks++;
 
   debug("tick: %d\n", ticks);
 
@@ -461,7 +469,7 @@ void tactics() {
   allShips->health = myHealth;
 
   me = allShips;
-  debug("Me: ");
+  debug("\t Me: ");
   printShip(me);
 
   if (number_of_ships > 1) {
@@ -477,29 +485,26 @@ void tactics() {
       allShips[i].health = shipHealth[i];
 
       if (isFriendly(i)) {
-        debug("ALLY: ");
+        debug("\t ALLY: ");
         printShip(&allShips[i]);
-        nFriends++;
         friends[nFriends] = &allShips[i];
+        nFriends++;
       } else {
-        debug("ENEMY: ");
+        debug("\t ENEMY: ");
         printShip(&allShips[i]);
         enemies[nEnemies] = &allShips[i];
         nEnemies++;
       }
     }
+    debug("\n");
 
   } else {
     debug("no ships visible\n");
   }
 
   if (nEnemies > 0) {
-    debug("sorting enemies\n");
-    // Sort enemies.
-    // nEnemies: sizeof array
-    // sizeof(Ship*): enemies is a pointer array
     qsort(enemies, nEnemies, sizeof(enemies[0]), cmp_ship);
-    if (rate_ship(enemies[0]) < 10+200+200){
+    if (rate_ship(enemies[0]) < 10+150+200){
         isRunningAway = false;
         target = *enemies;
     } else {
@@ -518,24 +523,31 @@ void tactics() {
 
   // Do we have an ideal ship to fire at?
   if (target != NULL) {
-    debug("target selected\n");
+    debug("\t Target Selected: ");
     printShip(target);
     moveTowards(target);
 
     if (target->distance <= FIRING_RANGE) {
+      debug("\tFiring at Enemy: ");
+      printShip(target);
       fireAtShip(target);
     }
   } else {
     moveTowards(target);
+    if (nFriends > 0 && abs(me->health-friends[0]->health) >= 5){
+        fireAtShip(&alsan);
+    }
   }
   char msg[100];
   sprintf(msg, "%d %d", me->coords.x, me->coords.y);
   send_message("S1800083", "S1700804", msg);
+  debug("\n");
 }
 
 void messageReceived(char *msg) {
     int x, y;
     // TODO: Change for windows
+    if (ticks == 0) return;
     debug("Message recieved! '%s'\n", msg);
     int ret = sscanf(msg, "Message S1700804, S1800083, %d %d", &x, &y);
     if (!ret) return;
@@ -740,7 +752,7 @@ int main(int argc, char *argv[]) {
 
   receive_addr.sin_family = AF_INET;
   //	receive_addr.sin_addr.s_addr = inet_addr(IP_ADDRESS_SERVER);
-  receive_addr.sin_addr.s_addr = INADDR_ANY;
+  receive_addr.sin_addr.s_addr = bind_ip == NULL ? INADDR_ANY : inet_addr(bind_ip);
   receive_addr.sin_port = htons(PORT_RECEIVE);
 
   int ret = bind(sock_recv, (sockaddr *)&receive_addr, sizeof(sockaddr));
