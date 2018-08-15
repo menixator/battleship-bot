@@ -81,7 +81,6 @@ int moveX;
 int moveY;
 
 bool setFlag = true;
-int new_flag = 0;
 
 void send_message(char *dest, char *source, char *msg);
 void fire_at_ship(int X, int Y);
@@ -92,7 +91,7 @@ void set_new_flag(int newFlag);
 /********* Your tactics code starts here *********************/
 /*************************************************************/
 
-#define MY_FLAG 67678;
+#define MY_FLAG 67678
 #define FIRING_RANGE 100
 #define PARANOID 0
 #define DEBUG 1
@@ -100,11 +99,11 @@ void set_new_flag(int newFlag);
 #define TICK_MAX  4294967295
 #define MAX_ALLIES 3
 
+int new_flag = MY_FLAG;
 #define MIN_X 5
 #define MIN_Y 5
 #define MAX_X 995
 #define MAX_Y 995
-
 #if DEBUG
 #define DEBUG_FILE "debug.log"
 FILE *debug_fd;
@@ -130,7 +129,7 @@ struct Bearings {
   SPEED vSpeed;
 };
 
-unsigned int ticks = 0;
+unsigned int ticks = -1;
 
 int nFriends;
 int nEnemies;
@@ -156,6 +155,8 @@ Ship *me;
 
 Ship *enemies[MAX_SHIPS];
 Ship *friends[MAX_SHIPS];
+Ship alsan;
+bool messageRecievedFromAlsan = false;
 
 // Returns if the ship at index is a friendly
 bool isFriendly(int index) {
@@ -335,6 +336,17 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
     }
   }
 
+  if (messageRecievedFromAlsan && alsan.distance < VISIBLE_RANGE){
+    if (ship == NULL){
+        if (diff(coords, alsan.coords) < alsan.distance){
+            rating += 60000;
+        }
+    } else {
+        if (diff(coords, alsan.coords) < alsan.distance){
+            rating += 60000;
+        }
+    }
+  }
 
   if (isCloseToEdge(coords)){
     rating -= 50000;
@@ -386,7 +398,6 @@ int rate_ship(Ship* ship){
     int rating = 0;
     int distance;
     
-    debug("target: ");
     printShip(ship);
 
     for (int i=1;i<number_of_ships;i++){
@@ -476,7 +487,6 @@ void tactics() {
     // Sort enemies.
     // nEnemies: sizeof array
     // sizeof(Ship*): enemies is a pointer array
-    debug("nEnemies: %d, sizeof(enemies[0]): %lu\n",nEnemies, sizeof(enemies[0]));
     qsort(enemies, nEnemies, sizeof(enemies[0]), cmp_ship);
     if (rate_ship(enemies[0]) < 10+200+200){
         isRunningAway = false;
@@ -505,15 +515,28 @@ void tactics() {
       fireAtShip(target);
     }
   } else {
-    debug("there wasn't any target\n");
     moveTowards(target);
   }
   char msg[100];
-  sprintf(msg, "_, %d, %d", me->coords.x, me->coords.y);
+  sprintf(msg, "%d %d", me->coords.x, me->coords.y);
   send_message("S1800083", "S1700804", msg);
 }
 
-void messageReceived(char *msg) { debug("message recieved: '%s'\n", msg); }
+void messageReceived(char *msg) {
+    int x, y;
+    // TODO: Change for windows
+    debug("Message recieved! '%s'\n", msg);
+    int ret = sscanf(msg, "Message S1700804, S1800083, %d %d", &x, &y);
+    if (!ret) return;
+    alsan.coords.x = x;
+    alsan.coords.y = y;
+    alsan.distance = diff(me->coords, alsan.coords);
+
+    if (!messageRecievedFromAlsan) messageRecievedFromAlsan = true;
+
+    debug("ASLAN is at (%d, %d)\n", x, y);
+
+}
 
 /*************************************************************/
 /********* Your tactics code ends here ***********************/
