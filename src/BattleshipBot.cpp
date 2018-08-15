@@ -104,7 +104,7 @@ void set_new_flag(int newFlag);
 
 #define MY_FLAG 67678
 #define FIRING_RANGE 100
-#define PARANOID 0
+#define PARANOID 1 
 #define DEBUG 1
 #define VISIBLE_RANGE 200
 #define TICK_MAX  4294967295
@@ -171,16 +171,12 @@ bool messageRecievedFromAlsan = false;
 
 // Returns if the ship at index is a friendly
 bool isFriendly(int index) {
-    if (messageRecievedFromAlsan && abs(alsan.coords.x-allShips[index].coords.x) <= 4 && abs(alsan.coords.y - allShips[index].coords.y) <= 4 && allShips[index].flag == MY_FLAG){
-        debug("ALSAN is at: (%d, %d)\n", alsan.coords.x, alsan.coords.y);
-        debug("DIFF: (%d, %d)\n", alsan.coords.x-allShips[index].coords.x, alsan.coords.y-allShips[index].coords.y);
-    }
-
 // Paranoid mode for testing.
 #if PARANOID
   return false;
 #else
-  return messageRecievedFromAlsan && abs(alsan.coords.x-allShips[index].coords.x) <= 3 && abs(alsan.coords.y - allShips[index].coords.y) <= 3 && allShips[index].flag == MY_FLAG;
+  // return allShips[index].flag == new_flag;
+    return abs(alsan.coords.x-allShips[index].coords.x) <= 3 && abs(alsan.coords.y - allShips[index].coords.y) <= 3;
 #endif
 }
 
@@ -556,7 +552,6 @@ void messageReceived(char *msg) {
     alsan.distance = diff(me->coords, alsan.coords);
 
     if (!messageRecievedFromAlsan) messageRecievedFromAlsan = true;
-
     debug("ASLAN is at (%d, %d)\n", x, y);
 
 }
