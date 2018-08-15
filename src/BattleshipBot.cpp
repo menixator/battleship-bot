@@ -1,5 +1,16 @@
-// BattleshipBot.cpp : Defines the entry point for the console application.
-//
+/***************************************************
+ * BattleShipBot.cpp
+ * Author:      Ahmed Miljau
+ * Student Id:  S1700804
+ * Defines the entrypoint of the application
+ *
+ ***************************************************
+ *                  CHANGES
+ ***************************************************
+ * v0.1: Improved tactics to follow and kill
+ *  weakest and closest enemy
+ * v0.2: Add 
+ */
 
 #include <iostream>
 #include <math.h>
@@ -164,7 +175,7 @@ bool isFriendly(int index) {
 #if PARANOID
   return false;
 #else
-  return allShips[index].flag == MY_FLAG;
+  return messageRecievedFromAlsan && abs(alsan.coords.x-allShips[index].coords.x) <= 4 && abs(alsan.coords.y - allShips[index].coords.y) <= 4 && allShips[index].flag == MY_FLAG;
 #endif
 }
 
@@ -336,14 +347,14 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
     }
   }
 
-  if (messageRecievedFromAlsan && alsan.distance < VISIBLE_RANGE){
+  if (messageRecievedFromAlsan && alsan.distance > VISIBLE_RANGE){
     if (ship == NULL){
         if (diff(coords, alsan.coords) < alsan.distance){
-            rating += 60000;
+            rating += 100000;
         }
     } else {
         if (diff(coords, alsan.coords) < alsan.distance){
-            rating += 60000;
+            rating += 50000;
         }
     }
   }
@@ -750,3 +761,4 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
+
