@@ -48,6 +48,9 @@ int sock_recv; // This is our socket, it is the handle to the IO address to
 
 char InputBuffer[MAX_BUFFER_SIZE];
 
+bool isRunningAway = false;
+int runAwayStart = -1;
+
 int myX;
 int myY;
 int myHealth;
@@ -95,7 +98,7 @@ void set_new_flag(int newFlag);
 #define DEBUG 1
 #define VISIBLE_RANGE 200
 #define JIGGLE_DELTA 3
-#define TICK_MAX 1024
+#define TICK_MAX  4294967295
 #define CLAMP(target, min, max)                                                \
   ((target) <= min ? min : (target) >= max ? max : (target))
 #define MAX_ALLIES 3
@@ -197,8 +200,8 @@ void fireAtShip(Ship *ship) {
 }
 
 void printShip(Ship *ship) {
-  debug("Ship{x=%d, y=%d, health=%d, flag=%d, type=%d, distance=%d}\n",
-        ship->coords.x, ship->coords.y, ship->health, ship->flag, ship->type,
+  debug("Ship{id=%d, x=%d, y=%d, health=%d, flag=%d, type=%d, distance=%d}\n",
+        ship->id, ship->coords.x, ship->coords.y, ship->health, ship->flag, ship->type,
         ship->distance);
 }
 
@@ -267,6 +270,7 @@ void move(Bearings bearings) {
 
 int diff(Coordinates a, Coordinates b) {
   int ret = (int)sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+  if (ret < 0){ printf("diff: (%d, %d), (%d, %d)%d\n", a.x, a.y, b.x, b.y, ret);}
   assert(ret >= 0);
   return ret;
 }
@@ -283,11 +287,11 @@ int getNewCoordinate(Coordinates *coords, NAMED_BEARING namedBearing,
 
 
 bool isCloseToEdge(Coordinates coords) {
-  return coords.x <= 10 || coords.x >= 980 || coords.y <= 10 || coords.y >= 980;
+  return coords.x <= 40 || coords.x >= 960 || coords.y <= 40 || coords.y >= 960;
 }
 
 bool isOutOfGrid(Coordinates coords){
-    return coords.x < MIN_X || coords.x > MAX_X || coords.y <= MIN_Y || coords.y > MAX_Y;
+    return coords.x <= MIN_X || coords.x >= MAX_X || coords.y <= MIN_Y || coords.y >= MAX_Y;
 }
 
 bool isAligned(Coordinates a, Coordinates b) {
@@ -305,18 +309,18 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
     int distance = diff(coords, enemies[i]->coords);
 
     if (ship != NULL && enemies[i]->id == ship->id) {
-
       if (diff(coords, ship->coords) < diff(me->coords, ship->coords)) {
         rating += 4096 * ((VISIBLE_RANGE - distance) + enemies[i]->health);
       }
       continue;
     }
+
     rating -= 4096 * ((VISIBLE_RANGE - distance) + enemies[i]->health);
 
     if (distance < pDistance) {
-      rating -= 10000;
+      rating -= 14000;
     } else if (distance > pDistance) {
-      rating += 10000;
+      rating += 14000;
     }
 
     if (isAligned(enemies[i]->coords, coords)) {
@@ -324,14 +328,20 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
     }
   }
 
-  if (isCloseToEdge(coords)) {
-    rating -= 50000;
-  }
+  // rating -= 1000*(abs(500 - coords.x) + abs(500-coords.y));
 
   if (last_bearings != STATIONARY && last_bearings == bearing) {
     rating += 7500;
+    if (isRunningAway && ticks-runAwayStart > 0){
+      rating += 25000;
+    }
   }
-  rating += 5 * (1000 - abs(500 - coords.x) - abs(500 - coords.y));
+
+
+  if (isCloseToEdge(coords)){
+    rating -= 50000;
+  }
+  rating += 100 *(1000 - abs(500 - coords.x) - abs(500 - coords.y));
 
   return rating;
 }
@@ -353,7 +363,9 @@ int cmp_direction(const void *a, const void *b, void *p_ship) {
   }
   int bRating = rate_coordinate(bearingB, coordB, ship);
   int aRating = rate_coordinate(bearingA, coordA, ship);
-
+  if (bRating - aRating == 0){
+    return ticks > 500 ? 1 : -1;
+  }
   return bRating - aRating;
 }
 
@@ -361,7 +373,7 @@ void moveTowards(Ship *ship) {
   if (ship != NULL) {
     printShip(ship);
   }
-  qsort_r(bearings, sizeof(bearings) / sizeof(*bearings), sizeof(bearings[0]),
+  qsort_r(bearings, sizeof(bearings)/sizeof(*bearings), sizeof(bearings[0]),
           cmp_direction, (void *)ship);
 
   Bearings new_bearings;
@@ -371,16 +383,30 @@ void moveTowards(Ship *ship) {
   move(new_bearings);
 }
 
+int rate_ship(Ship* ship){
+    int rating = 0;
+    int distance;
+    
+    debug("target: ");
+    printShip(ship);
+
+    for (int i=1;i<number_of_ships;i++){
+        if (allShips[i].id == ship->id || isFriendly(i)) continue;
+        distance = diff(ship->coords, allShips[i].coords);
+        if (distance < FIRING_RANGE){
+            rating += 100;
+        }
+    }
+
+    rating += ship->health;
+    rating += ship->distance;
+    return rating;
+}
+
 int cmp_ship(const void *a, const void *b) {
-  Ship *shipA = (Ship *)a;
-  Ship *shipB = (Ship *)b;
-
-  if (shipA->health != shipB->health)
-    return shipA->health - shipB->health;
-
-  if (shipA->distance != shipB->distance)
-    return shipA->distance - shipB->distance;
-  return 0;
+  Ship **shipA = (Ship **)a;
+  Ship **shipB = (Ship **)b;
+  return rate_ship(*shipA)-rate_ship(*shipB);
 }
 
 void tactics() {
@@ -400,9 +426,10 @@ void tactics() {
   nFriends = 0;
   nEnemies = 0;
 
-  memset(enemies, 0, sizeof enemies);
-  memset(friends, 0, sizeof friends);
-  memset(allShips, 0, sizeof allShips);
+  //memset(allShips, 0, sizeof(allShips)*sizeof(Ship));
+  //memset(enemies, 0, sizeof(Ship*)*sizeof(enemies));
+  //memset(friends, 0, sizeof(Ship*)*sizeof(friends));
+
 
   allShips->id = 0;
   allShips->coords.x = myX;
@@ -450,8 +477,20 @@ void tactics() {
     // Sort enemies.
     // nEnemies: sizeof array
     // sizeof(Ship*): enemies is a pointer array
-    qsort(enemies, nEnemies, sizeof(Ship *), cmp_ship);
-    target = *enemies;
+    debug("nEnemies: %d, sizeof(enemies[0]): %lu\n",nEnemies, sizeof(enemies[0]));
+    qsort(enemies, nEnemies, sizeof(enemies[0]), cmp_ship);
+    if (rate_ship(enemies[0]) < 10+200+200){
+        isRunningAway = false;
+        target = *enemies;
+    } else {
+        runAwayStart = ticks;
+        isRunningAway = true;
+    }
+  } else {
+      if (isRunningAway && ticks-runAwayStart > 500){
+        isRunningAway = false;
+        runAwayStart = -1;
+      }
   }
 
   // Do we have an ideal ship to fire at?
