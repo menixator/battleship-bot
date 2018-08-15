@@ -92,15 +92,12 @@ void set_new_flag(int newFlag);
 /********* Your tactics code starts here *********************/
 /*************************************************************/
 
-#define MY_FLAG 10;
+#define MY_FLAG 67678;
 #define FIRING_RANGE 100
-#define PARANOID 1
+#define PARANOID 0
 #define DEBUG 1
 #define VISIBLE_RANGE 200
-#define JIGGLE_DELTA 3
 #define TICK_MAX  4294967295
-#define CLAMP(target, min, max)                                                \
-  ((target) <= min ? min : (target) >= max ? max : (target))
 #define MAX_ALLIES 3
 
 #define MIN_X 5
@@ -295,8 +292,9 @@ bool isOutOfGrid(Coordinates coords){
 }
 
 bool isAligned(Coordinates a, Coordinates b) {
-  return abs(a.x - b.x) == 0 || abs(a.y - b.y) == 0 ||
-         (abs(a.x - b.x) == abs(a.y - b.y));
+  return abs(a.x - b.x) == 0 || abs(a.y - b.y) == 0;
+      // ||
+      //   (abs(a.x - b.x) == abs(a.y - b.y));
 }
 
 
@@ -324,7 +322,7 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
     }
 
     if (isAligned(enemies[i]->coords, coords)) {
-      rating -= 100;
+      rating -= 10000;
     }
   }
 
@@ -341,7 +339,7 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
   if (isCloseToEdge(coords)){
     rating -= 50000;
   }
-  rating += 100 *(1000 - abs(500 - coords.x) - abs(500 - coords.y));
+  rating += 1000 *(1000 - abs(500 - coords.x) - abs(500 - coords.y));
 
   return rating;
 }
@@ -383,6 +381,7 @@ void moveTowards(Ship *ship) {
   move(new_bearings);
 }
 
+// Bigger value means worse
 int rate_ship(Ship* ship){
     int rating = 0;
     int distance;
@@ -398,7 +397,7 @@ int rate_ship(Ship* ship){
         }
     }
 
-    rating += ship->health;
+    rating += ship->health-me->health;
     rating += ship->distance;
     return rating;
 }
@@ -483,6 +482,9 @@ void tactics() {
         isRunningAway = false;
         target = *enemies;
     } else {
+        if (enemies[0]->distance <= FIRING_RANGE){
+            fireAtShip(enemies[0]);
+        }
         runAwayStart = ticks;
         isRunningAway = true;
     }
@@ -506,6 +508,9 @@ void tactics() {
     debug("there wasn't any target\n");
     moveTowards(target);
   }
+  char msg[100];
+  sprintf(msg, "_, %d, %d", me->coords.x, me->coords.y);
+  send_message("S1800083", "S1700804", msg);
 }
 
 void messageReceived(char *msg) { debug("message recieved: '%s'\n", msg); }
