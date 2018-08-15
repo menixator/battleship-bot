@@ -100,10 +100,10 @@ void set_new_flag(int newFlag);
   ((target) <= min ? min : (target) >= max ? max : (target))
 #define MAX_ALLIES 3
 
-#define MIN_X 5;
-#define MIN_Y 5;
-#define MAX_X 995;
-#define MAX_Y 995;
+#define MIN_X 5
+#define MIN_Y 5
+#define MAX_X 995
+#define MAX_Y 995
 
 #if DEBUG
 #define DEBUG_FILE "debug.log"
@@ -286,6 +286,10 @@ bool isCloseToEdge(Coordinates coords) {
   return coords.x <= 10 || coords.x >= 980 || coords.y <= 10 || coords.y >= 980;
 }
 
+bool isOutOfGrid(Coordinates coords){
+    return coords.x < MIN_X || coords.x > MAX_X || coords.y <= MIN_Y || coords.y > MAX_Y;
+}
+
 bool isAligned(Coordinates a, Coordinates b) {
   return abs(a.x - b.x) == 0 || abs(a.y - b.y) == 0 ||
          (abs(a.x - b.x) == abs(a.y - b.y));
@@ -321,7 +325,7 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
   }
 
   if (isCloseToEdge(coords)) {
-    rating -= 5000;
+    rating -= 50000;
   }
 
   if (last_bearings != STATIONARY && last_bearings == bearing) {
@@ -339,6 +343,14 @@ int cmp_direction(const void *a, const void *b, void *p_ship) {
   Coordinates coordA, coordB;
   getNewCoordinate(&coordA, bearingA, FAST);
   getNewCoordinate(&coordB, bearingB, FAST);
+
+  if (isOutOfGrid(coordA) && !isOutOfGrid(coordB)){
+    return -1;
+  } else if (isOutOfGrid(coordB) && !isOutOfGrid(coordA)){
+    return 1;
+  } else if (isOutOfGrid(coordA) && isOutOfGrid(coordB)){
+    return 0;
+  }
   int bRating = rate_coordinate(bearingB, coordB, ship);
   int aRating = rate_coordinate(bearingA, coordA, ship);
 
