@@ -9,7 +9,7 @@
  ***************************************************
  * v0.1: Improved tactics to follow and kill
  *  weakest and closest enemy
- * v0.2: Add
+ * v0.2: Add rating system
  */
 
 #include <iostream>
@@ -59,6 +59,7 @@ int sock_recv; // This is our socket, it is the handle to the IO address to
 
 char InputBuffer[MAX_BUFFER_SIZE];
 
+// Whether or not we are running away
 bool isRunningAway = false;
 int runAwayStart = -1;
 
@@ -102,19 +103,33 @@ void set_new_flag(int newFlag);
 /********* Your tactics code starts here *********************/
 /*************************************************************/
 
+// Our Flag
 #define MY_FLAG 67678
+
+// Define the firing range for ease of use
 #define FIRING_RANGE 100
-#define PARANOID 1
-#define DEBUG 1
+
+// Visible Range for convenience
 #define VISIBLE_RANGE 200
+
+// Maximum of the tick variable
 #define TICK_MAX 4294967295
-#define MAX_ALLIES 3
+
+// A Test mode
+#define PARANOID 0
+
+// A macro used to turn debugging on and off
+#define DEBUG 0
+
 
 int new_flag = MY_FLAG;
+// Some macros for convenience defining the grid edges
 #define MIN_X 5
 #define MIN_Y 5
 #define MAX_X 995
 #define MAX_Y 995
+
+// Debugging setup
 #if DEBUG
 #define DEBUG_FILE "debug.log"
 FILE *debug_fd;
@@ -130,9 +145,14 @@ FILE *debug_fd;
   } while (0)
 #endif
 
+// An Enumerator that defines the speed
 enum SPEED { SLOW, REST, FAST };
+
+// An enumerator the defines the direction on an axis
 enum BEARING { POS, NEG, ZERO };
 
+
+// Defines the direction
 struct Bearings {
   BEARING hBearing;
   BEARING vBearing;
@@ -140,16 +160,25 @@ struct Bearings {
   SPEED vSpeed;
 };
 
+// Used to keep track of the state and add different
+// distinctions to behavior using the number of ticks passed
 unsigned int ticks = 0;
 
+
+// Number of friends
 int nFriends;
+// Number of enemies
 int nEnemies;
 
+
+// Coordinates structure. Defines an (x, y)
 struct Coordinates {
   int x;
   int y;
 };
 
+// A Ship structure that groups all the information about the
+// ship
 struct Ship {
   int id;
   Coordinates coords;
@@ -161,11 +190,19 @@ struct Ship {
   int type;
 };
 
+// allShips will contain all the visible ships
 Ship allShips[MAX_SHIPS];
+
+// Me is a pointer to our own ship
 Ship *me;
 
+// enemies is a pointer array to all the enemies that are
+// visible
 Ship *enemies[MAX_SHIPS];
+// friends is a pointer array to all the friends
 Ship *friends[MAX_SHIPS];
+
+// Stores my ally's information
 Ship alsan;
 bool messageRecievedFromAlsan = false;
 
@@ -175,9 +212,7 @@ bool isFriendly(int index) {
 #if PARANOID
   return false;
 #else
-  // return allShips[index].flag == new_flag;
-  return abs(alsan.coords.x - allShips[index].coords.x) <= 3 &&
-         abs(alsan.coords.y - allShips[index].coords.y) <= 3;
+  return allShips[index].flag == new_flag;
 #endif
 }
 
@@ -194,33 +229,39 @@ enum NAMED_BEARING {
   SOUTH_WEST
 };
 
+// Last bearing that the ship was moving.
 NAMED_BEARING last_bearings = STATIONARY;
 
+
+// The movements that the ship is allowed to make.
 NAMED_BEARING bearings[] = {NORTH,      SOUTH,      EAST,       WEST,
                             NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST};
 
-// Function definitions.
-void fireAtShip(Ship *ship);
-void printShip(Ship *ship);
 
+// Fires at ta coordinate
 void fireAt(Coordinates coords) { fire_at_ship(coords.x, coords.y); }
-void fireAtShip(Ship *ship) {
-  debug("Firing at: ");
-  printShip(ship);
-  fire_at_ship(ship->coords.x, ship->coords.y);
-}
 
+// Dumps the ship information to stdout
 void printShip(Ship *ship) {
   debug("Ship{id=%d, x=%d, y=%d, health=%d, flag=%d, type=%d, distance=%d}\n",
         ship->id, ship->coords.x, ship->coords.y, ship->health, ship->flag,
         ship->type, ship->distance);
 }
 
+// Fires at a ship
+void fireAtShip(Ship *ship) {
+  debug("Firing at: ");
+  printShip(ship);
+  fire_at_ship(ship->coords.x, ship->coords.y);
+}
+
+// Dumps Bearing strctures. Used for debugging.
 void printBearings(Bearings bearings) {
   debug("Bearings{horizontal=%d, vertical=%d, hSpeed=%d, vSpeed=%d}\n",
         bearings.hBearing, bearings.vBearing, bearings.hSpeed, bearings.vSpeed);
 }
 
+// Converts a named bearing such as NORTH or SOUTH to a Bearing struct
 int namedBearingToBearings(Bearings *bearing, NAMED_BEARING namedBearing,
                            SPEED speed) {
   int vertical = 0;
@@ -273,12 +314,13 @@ int namedBearingToBearings(Bearings *bearing, NAMED_BEARING namedBearing,
   return 0;
 }
 
+// Move with bearings
 void move(Bearings bearings) {
   printBearings(bearings);
   move_in_direction(bearings.hBearing * bearings.hSpeed,
                     bearings.vBearing * bearings.vSpeed);
 }
-
+// Gives the Euclidean distnace between two coordinates.
 int diff(Coordinates a, Coordinates b) {
   int ret = (int)sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
   if (ret < 0) {
@@ -288,6 +330,8 @@ int diff(Coordinates a, Coordinates b) {
   return ret;
 }
 
+// Gets the new coordinate if the ship moved in the direction specified
+// by the named bearing. eg: (0,0) + NORTH = (0,1)
 int getNewCoordinate(Coordinates *coords, NAMED_BEARING namedBearing,
                      SPEED speed) {
   Bearings bearings;
@@ -298,21 +342,24 @@ int getNewCoordinate(Coordinates *coords, NAMED_BEARING namedBearing,
   return 0;
 }
 
+// Returns whether or not the coordinates are close to the coordinates.
 bool isCloseToEdge(Coordinates coords) {
   return coords.x <= 40 || coords.x >= 960 || coords.y <= 40 || coords.y >= 960;
 }
 
+// Returns whether or not the coordinate is out of the grid.
 bool isOutOfGrid(Coordinates coords) {
   return coords.x <= MIN_X || coords.x >= MAX_X || coords.y <= MIN_Y ||
          coords.y >= MAX_Y;
 }
 
+// Returns whether or not coordinates a and b share a x or y coordinate.
 bool isAligned(Coordinates a, Coordinates b) {
-  return abs(a.x - b.x) == 0 || abs(a.y - b.y) == 0;
-  // ||
-  //   (abs(a.x - b.x) == abs(a.y - b.y));
+  return a.x == b.x  || a.y == b.y;
 }
 
+// Rates a coordinate based on various factors. The bigger the rating is,
+// the better it is.
 int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
   // Rating starts at 0
   int rating = 0;
@@ -362,19 +409,18 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
     }
   }
 
-  // if (isCloseToEdge(coords)){
-  //  rating -= 50000;
-  //}
   Coordinates center;
   center.x = 500;
   center.y = 500;
 
-  debug("distance from center: %d\n", diff(coords, center));
   rating -= 1000 * diff(coords, center);
 
   return rating;
 }
 
+// Compares directions a and b. if a is better, a negative value is returned,
+// if b is better, a positive value is returned. If they're both equal,
+// 0 is returned.
 int cmp_direction(const void *a, const void *b, void *p_ship) {
   NAMED_BEARING bearingA = *(NAMED_BEARING *)a;
   NAMED_BEARING bearingB = *(NAMED_BEARING *)b;
@@ -398,6 +444,7 @@ int cmp_direction(const void *a, const void *b, void *p_ship) {
   return bRating - aRating;
 }
 
+// Moves toward a ship. Ship can be null.
 void moveTowards(Ship *ship) {
   if (ship != NULL) {
     debug("\tMoving Towards: ");
@@ -413,7 +460,8 @@ void moveTowards(Ship *ship) {
   move(new_bearings);
 }
 
-// Bigger value means worse
+// Rates a ship based on various factors.
+// A bigger value means it is worse. 
 int rate_ship(Ship *ship) {
   int rating = 0;
   int distance;
@@ -432,12 +480,14 @@ int rate_ship(Ship *ship) {
   return rating;
 }
 
+// Compares two ships.
 int cmp_ship(const void *a, const void *b) {
   Ship **shipA = (Ship **)a;
   Ship **shipB = (Ship **)b;
   return rate_ship(*shipA) - rate_ship(*shipB);
 }
 
+// Start of the tactics method.
 void tactics() {
   if (ticks >= TICK_MAX) {
     ticks %= TICK_MAX;
@@ -544,7 +594,6 @@ void tactics() {
 
 void messageReceived(char *msg) {
   int x, y;
-  // TODO: Change for windows
   if (ticks == 0)
     return;
   debug("Message recieved! '%s'\n", msg);
