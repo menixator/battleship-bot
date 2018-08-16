@@ -9,7 +9,7 @@
  ***************************************************
  * v0.1: Improved tactics to follow and kill
  *  weakest and closest enemy
- * v0.2: Add 
+ * v0.2: Add
  */
 
 #include <iostream>
@@ -104,10 +104,10 @@ void set_new_flag(int newFlag);
 
 #define MY_FLAG 67678
 #define FIRING_RANGE 100
-#define PARANOID 1 
+#define PARANOID 1
 #define DEBUG 1
 #define VISIBLE_RANGE 200
-#define TICK_MAX  4294967295
+#define TICK_MAX 4294967295
 #define MAX_ALLIES 3
 
 int new_flag = MY_FLAG;
@@ -176,7 +176,8 @@ bool isFriendly(int index) {
   return false;
 #else
   // return allShips[index].flag == new_flag;
-    return abs(alsan.coords.x-allShips[index].coords.x) <= 3 && abs(alsan.coords.y - allShips[index].coords.y) <= 3;
+  return abs(alsan.coords.x - allShips[index].coords.x) <= 3 &&
+         abs(alsan.coords.y - allShips[index].coords.y) <= 3;
 #endif
 }
 
@@ -211,8 +212,8 @@ void fireAtShip(Ship *ship) {
 
 void printShip(Ship *ship) {
   debug("Ship{id=%d, x=%d, y=%d, health=%d, flag=%d, type=%d, distance=%d}\n",
-        ship->id, ship->coords.x, ship->coords.y, ship->health, ship->flag, ship->type,
-        ship->distance);
+        ship->id, ship->coords.x, ship->coords.y, ship->health, ship->flag,
+        ship->type, ship->distance);
 }
 
 void printBearings(Bearings bearings) {
@@ -280,7 +281,9 @@ void move(Bearings bearings) {
 
 int diff(Coordinates a, Coordinates b) {
   int ret = (int)sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
-  if (ret < 0){ printf("diff: (%d, %d), (%d, %d)%d\n", a.x, a.y, b.x, b.y, ret);}
+  if (ret < 0) {
+    printf("diff: (%d, %d), (%d, %d)%d\n", a.x, a.y, b.x, b.y, ret);
+  }
   assert(ret >= 0);
   return ret;
 }
@@ -295,21 +298,20 @@ int getNewCoordinate(Coordinates *coords, NAMED_BEARING namedBearing,
   return 0;
 }
 
-
 bool isCloseToEdge(Coordinates coords) {
   return coords.x <= 40 || coords.x >= 960 || coords.y <= 40 || coords.y >= 960;
 }
 
-bool isOutOfGrid(Coordinates coords){
-    return coords.x <= MIN_X || coords.x >= MAX_X || coords.y <= MIN_Y || coords.y >= MAX_Y;
+bool isOutOfGrid(Coordinates coords) {
+  return coords.x <= MIN_X || coords.x >= MAX_X || coords.y <= MIN_Y ||
+         coords.y >= MAX_Y;
 }
 
 bool isAligned(Coordinates a, Coordinates b) {
   return abs(a.x - b.x) == 0 || abs(a.y - b.y) == 0;
-      // ||
-      //   (abs(a.x - b.x) == abs(a.y - b.y));
+  // ||
+  //   (abs(a.x - b.x) == abs(a.y - b.y));
 }
-
 
 int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
   // Rating starts at 0
@@ -343,20 +345,20 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
 
   if (last_bearings != STATIONARY && last_bearings == bearing) {
     rating += 7500;
-    if (isRunningAway && ticks-runAwayStart > 0){
+    if (isRunningAway && ticks - runAwayStart > 0) {
       rating += 25000;
     }
   }
 
-  if (messageRecievedFromAlsan && alsan.distance > VISIBLE_RANGE){
-    if (ship == NULL){
-        if (diff(coords, alsan.coords) < alsan.distance){
-            rating += 100000;
-        }
+  if (messageRecievedFromAlsan && alsan.distance > VISIBLE_RANGE) {
+    if (ship == NULL) {
+      if (diff(coords, alsan.coords) < alsan.distance) {
+        rating += 100000;
+      }
     } else {
-        if (diff(coords, alsan.coords) < alsan.distance){
-            rating += 50000;
-        }
+      if (diff(coords, alsan.coords) < alsan.distance) {
+        rating += 50000;
+      }
     }
   }
 
@@ -368,7 +370,7 @@ int rate_coordinate(NAMED_BEARING bearing, Coordinates coords, Ship *ship) {
   center.y = 500;
 
   debug("distance from center: %d\n", diff(coords, center));
-  rating -= 1000*diff(coords, center);
+  rating -= 1000 * diff(coords, center);
 
   return rating;
 }
@@ -381,16 +383,16 @@ int cmp_direction(const void *a, const void *b, void *p_ship) {
   getNewCoordinate(&coordA, bearingA, FAST);
   getNewCoordinate(&coordB, bearingB, FAST);
 
-  if (isOutOfGrid(coordA) && !isOutOfGrid(coordB)){
+  if (isOutOfGrid(coordA) && !isOutOfGrid(coordB)) {
     return -1;
-  } else if (isOutOfGrid(coordB) && !isOutOfGrid(coordA)){
+  } else if (isOutOfGrid(coordB) && !isOutOfGrid(coordA)) {
     return 1;
-  } else if (isOutOfGrid(coordA) && isOutOfGrid(coordB)){
+  } else if (isOutOfGrid(coordA) && isOutOfGrid(coordB)) {
     return 0;
   }
   int bRating = rate_coordinate(bearingB, coordB, ship);
   int aRating = rate_coordinate(bearingA, coordA, ship);
-  if (bRating - aRating == 0){
+  if (bRating - aRating == 0) {
     return ticks > 500 ? 1 : -1;
   }
   return bRating - aRating;
@@ -401,7 +403,7 @@ void moveTowards(Ship *ship) {
     debug("\tMoving Towards: ");
     printShip(ship);
   }
-  qsort_r(bearings, sizeof(bearings)/sizeof(*bearings), sizeof(bearings[0]),
+  qsort_r(bearings, sizeof(bearings) / sizeof(*bearings), sizeof(bearings[0]),
           cmp_direction, (void *)ship);
 
   Bearings new_bearings;
@@ -412,33 +414,34 @@ void moveTowards(Ship *ship) {
 }
 
 // Bigger value means worse
-int rate_ship(Ship* ship){
-    int rating = 0;
-    int distance;
+int rate_ship(Ship *ship) {
+  int rating = 0;
+  int distance;
 
-    for (int i=1;i<number_of_ships;i++){
-        if (allShips[i].id == ship->id || isFriendly(i)) continue;
-        distance = diff(ship->coords, allShips[i].coords);
-        if (distance < FIRING_RANGE){
-            rating += 100;
-        }
+  for (int i = 1; i < number_of_ships; i++) {
+    if (allShips[i].id == ship->id || isFriendly(i))
+      continue;
+    distance = diff(ship->coords, allShips[i].coords);
+    if (distance < FIRING_RANGE) {
+      rating += 100;
     }
+  }
 
-    rating += ship->health-me->health;
-    rating += ship->distance;
-    return rating;
+  rating += ship->health - me->health;
+  rating += ship->distance;
+  return rating;
 }
 
 int cmp_ship(const void *a, const void *b) {
   Ship **shipA = (Ship **)a;
   Ship **shipB = (Ship **)b;
-  return rate_ship(*shipA)-rate_ship(*shipB);
+  return rate_ship(*shipA) - rate_ship(*shipB);
 }
 
 void tactics() {
   if (ticks >= TICK_MAX) {
     ticks %= TICK_MAX;
-  } 
+  }
   ticks++;
 
   debug("tick: %d\n", ticks);
@@ -451,10 +454,9 @@ void tactics() {
   nFriends = 0;
   nEnemies = 0;
 
-  //memset(allShips, 0, sizeof(allShips)*sizeof(Ship));
-  //memset(enemies, 0, sizeof(Ship*)*sizeof(enemies));
-  //memset(friends, 0, sizeof(Ship*)*sizeof(friends));
-
+  // memset(allShips, 0, sizeof(allShips)*sizeof(Ship));
+  // memset(enemies, 0, sizeof(Ship*)*sizeof(enemies));
+  // memset(friends, 0, sizeof(Ship*)*sizeof(friends));
 
   allShips->id = 0;
   allShips->coords.x = myX;
@@ -500,21 +502,21 @@ void tactics() {
 
   if (nEnemies > 0) {
     qsort(enemies, nEnemies, sizeof(enemies[0]), cmp_ship);
-    if (rate_ship(enemies[0]) < 10+150+200){
-        isRunningAway = false;
-        target = *enemies;
+    if (rate_ship(enemies[0]) < 10 + 150 + 200) {
+      isRunningAway = false;
+      target = *enemies;
     } else {
-        if (enemies[0]->distance <= FIRING_RANGE){
-            fireAtShip(enemies[0]);
-        }
-        runAwayStart = ticks;
-        isRunningAway = true;
+      if (enemies[0]->distance <= FIRING_RANGE) {
+        fireAtShip(enemies[0]);
+      }
+      runAwayStart = ticks;
+      isRunningAway = true;
     }
   } else {
-      if (isRunningAway && ticks-runAwayStart > 500){
-        isRunningAway = false;
-        runAwayStart = -1;
-      }
+    if (isRunningAway && ticks - runAwayStart > 500) {
+      isRunningAway = false;
+      runAwayStart = -1;
+    }
   }
 
   // Do we have an ideal ship to fire at?
@@ -530,8 +532,8 @@ void tactics() {
     }
   } else {
     moveTowards(target);
-    if (nFriends > 0 && abs(me->health-friends[0]->health) >= 5){
-        fireAtShip(&alsan);
+    if (nFriends > 0 && abs(me->health - friends[0]->health) >= 5) {
+      fireAtShip(&alsan);
     }
   }
   char msg[100];
@@ -541,19 +543,21 @@ void tactics() {
 }
 
 void messageReceived(char *msg) {
-    int x, y;
-    // TODO: Change for windows
-    if (ticks == 0) return;
-    debug("Message recieved! '%s'\n", msg);
-    int ret = sscanf(msg, "Message S1700804, S1800083, %d %d", &x, &y);
-    if (!ret) return;
-    alsan.coords.x = x;
-    alsan.coords.y = y;
-    alsan.distance = diff(me->coords, alsan.coords);
+  int x, y;
+  // TODO: Change for windows
+  if (ticks == 0)
+    return;
+  debug("Message recieved! '%s'\n", msg);
+  int ret = sscanf(msg, "Message S1700804, S1800083, %d %d", &x, &y);
+  if (!ret)
+    return;
+  alsan.coords.x = x;
+  alsan.coords.y = y;
+  alsan.distance = diff(me->coords, alsan.coords);
 
-    if (!messageRecievedFromAlsan) messageRecievedFromAlsan = true;
-    debug("ASLAN is at (%d, %d)\n", x, y);
-
+  if (!messageRecievedFromAlsan)
+    messageRecievedFromAlsan = true;
+  debug("ASLAN is at (%d, %d)\n", x, y);
 }
 
 /*************************************************************/
@@ -641,8 +645,8 @@ void communicate_with_server() {
 
         if (moveShip) {
           sprintf(buffer, "Move %s,%d,%d", STUDENT_NUMBER, moveX, moveY);
-          sendto(sock_send, buffer, strlen(buffer), 0,
-                      (sockaddr *)&sendto_addr, sizeof(sockaddr));
+          sendto(sock_send, buffer, strlen(buffer), 0, (sockaddr *)&sendto_addr,
+                 sizeof(sockaddr));
           moveShip = false;
         }
 
@@ -747,7 +751,8 @@ int main(int argc, char *argv[]) {
 
   receive_addr.sin_family = AF_INET;
   //	receive_addr.sin_addr.s_addr = inet_addr(IP_ADDRESS_SERVER);
-  receive_addr.sin_addr.s_addr = bind_ip == NULL ? INADDR_ANY : inet_addr(bind_ip);
+  receive_addr.sin_addr.s_addr =
+      bind_ip == NULL ? INADDR_ANY : inet_addr(bind_ip);
   receive_addr.sin_port = htons(PORT_RECEIVE);
 
   int ret = bind(sock_recv, (sockaddr *)&receive_addr, sizeof(sockaddr));
@@ -768,4 +773,3 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
-
